@@ -254,58 +254,6 @@ void load_fonts() {
     }
 }
 
-// The letters of every translation, laid out once (which is what adds a glyph to the atlas): a text drawn
-// straight to a draw list (a page's heading, a row's words, a button's label) does not add its glyphs, and
-// without them it draws "?" until something else has. Called in a frame, after NewFrame.
-namespace {
-bool g_glyphs_asked = false;
-}
-
-void preload_translation_glyphs() {
-    if (g_glyphs_asked || recomp::i18n::language() != recomp::i18n::Language::Chinese) {
-        return;
-    }
-    g_glyphs_asked = true;
-    const std::string letters = recomp::i18n::translation_text();
-    for (int index = 0; index < 2; index++) {
-        if (g_fonts[index]) {
-            push_font(index == 1 ? Font::Semibold : Font::Regular, size::kBody);
-            ImGui::CalcTextSize(letters.c_str());  // (the layout is what bakes the glyphs, not this size)
-            pop_font();
-        }
-    }
-    if (const char* debug = std::getenv("RECOMP_LAUNCHER_I18N_DEBUG")) {
-        (void)debug;
-        std::fprintf(stderr, "[i18n] letters=%zu font=%s\n", letters.size(), g_cjk_font.c_str());
-        for (int index = 0; index < 2; index++) {
-            if (!g_fonts[index]) {
-                continue;
-            }
-            push_font(index == 1 ? Font::Semibold : Font::Regular, size::kBody);
-            ImFontBaked* baked = ImGui::GetFontBaked();
-            int have = 0, missing = 0;
-            for (const char* at = letters.c_str(); *at;) {
-                unsigned int cp = 0;
-                const int bytes = ImTextCharFromUtf8(&cp, at, nullptr);
-                if (bytes <= 0) {
-                    break;
-                }
-                at += bytes;
-                if (cp < 0x80) {
-                    continue;
-                }
-                if (baked->FindGlyphNoFallback(static_cast<ImWchar>(cp))) {
-                    have++;
-                } else {
-                    missing++;
-                }
-            }
-            std::fprintf(stderr, "[i18n] font %d: have=%d missing=%d\n", index, have, missing);
-            pop_font();
-        }
-    }
-}
-
 void begin_frame(float delta) {
     g_delta = std::min(delta, 0.1f);
     g_focus_next = false;

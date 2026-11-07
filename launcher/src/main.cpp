@@ -401,7 +401,6 @@ int main(int argc, char** argv) {
         ImGui_ImplSDLRenderer3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
-        ui::preload_translation_glyphs();
         touch.frame();
         if (!screenshot_prefix.empty() && shot_frames == 0 && !pressing && page_id.empty()) {
             app.set_page(shot_page);
