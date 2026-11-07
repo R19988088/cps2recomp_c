@@ -1942,7 +1942,6 @@ void App::display_cards(size_t which, float width) {
         }
         sound.end();
     }
-    language_card(width);
 }
 
 // The language the launcher and the games are drawn in: one row, kept in launcher.ini ([launcher] language),
@@ -3754,10 +3753,8 @@ void App::features_page(float width) {
         }
         ui::gap(26);
     }
-    // (a launcher with no Game page and no Display card, a collection's: the language is here)
-    if (!about_.game_page) {
-        language_card(width);
-    }
+    // (the language is a setting of the launcher's, not of a game: it is here, once, for every launcher)
+    language_card(width);
 
     if (!collection_) {
         Slot& one = slot();
