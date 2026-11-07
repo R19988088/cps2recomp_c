@@ -10,7 +10,7 @@
 #include <algorithm>
 #include <cmath>
 
-#include "../src/i18n.h"
+#include "i18n.h"
 #include "ui.h"
 
 namespace layout {

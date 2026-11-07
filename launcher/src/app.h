@@ -24,7 +24,7 @@
 #include "launcher.h"
 #include "online.h"
 #include "settings.h"
-#include "../src/i18n.h"
+#include "i18n.h"
 #ifdef LAUNCHER_UPDATE_REPO
 #include "update.h"
 #endif

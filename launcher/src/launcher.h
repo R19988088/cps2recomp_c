@@ -18,7 +18,7 @@
 
 #include "bindings.h"
 #include "settings.h"
-#include "../src/i18n.h"
+#include "i18n.h"
 
 namespace launcher {
 

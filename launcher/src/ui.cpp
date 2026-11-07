@@ -15,7 +15,7 @@
 #include <vector>
 
 #include "embedded.h"
-#include "../../src/i18n.h"
+#include "i18n.h"
 
 namespace ui {
 
