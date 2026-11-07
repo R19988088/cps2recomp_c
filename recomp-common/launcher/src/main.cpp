@@ -333,7 +333,10 @@ int main(int argc, char** argv) {
     ImGui::GetCurrentContext()->ConfigNavWindowingWithGamepad = false;  // (one window: no list of windows)
     ImGui::GetCurrentContext()->ConfigNavWindowingKeyNext = 0;
     ImGui::GetCurrentContext()->ConfigNavWindowingKeyPrev = 0;
+    // (the language, before the font: Chinese is drawn in a font of its own)
+    launcher::load_language();
     ui::load_fonts();
+
     ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer3_Init(renderer);
     ImGui_ImplSDL3_SetGamepadMode(ImGui_ImplSDL3_GamepadMode_AutoAll);
@@ -398,6 +401,7 @@ int main(int argc, char** argv) {
         ImGui_ImplSDLRenderer3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
+        ui::preload_translation_glyphs();
         touch.frame();
         if (!screenshot_prefix.empty() && shot_frames == 0 && !pressing && page_id.empty()) {
             app.set_page(shot_page);

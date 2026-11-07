@@ -18,6 +18,7 @@
 
 #include "bindings.h"
 #include "settings.h"
+#include "i18n.h"
 
 namespace launcher {
 
@@ -132,6 +133,11 @@ struct Description {
     // Under the game's name in the sidebar
     const char *subtitle = "native port";
 
+    // What the port's words are in other languages (i18n.h): the launcher installs them before it draws, so
+    // that every page, and the in-game menu of a game that sets the same table, says them. Empty: English alone,
+    // and no Language row.
+    std::vector<recomp::i18n::Translation> translations;
+
     // The port's own pages (none: the launcher's three)
     std::vector<CustomPage> pages;
     // true: the launcher opens on the Game page (not on the first of the port's own, which stay above it in the
@@ -195,6 +201,11 @@ struct Description {
 
 // The port's own file defines this.
 const Description &describe();
+
+// The player's language, before the launcher draws anything (it decides the font as well as the words): the
+// launcher reads launcher.ini's [launcher] language and sets it (i18n.h). A port whose own program reads the
+// same file sets the same table in its own start. The launcher's own defaults to English.
+void load_language();
 
 // ---- A collection: one launcher for several games -------------------------------------------------------
 //

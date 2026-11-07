@@ -5,11 +5,19 @@
 // Part of recomp-common (https://github.com/tmcleroy/recomp-common); see THIRD_PARTY_NOTICES.md.
 #include "ui.h"
 
+#include <SDL3/SDL.h>
+
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <filesystem>
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "embedded.h"
+#include "i18n.h"
 
 namespace ui {
 
@@ -38,6 +46,7 @@ bool g_animating = false;
 bool g_focus_next = false;
 int g_frames = 0;
 ImFont* g_fonts[2] = {};
+std::string g_cjk_font;
 std::unordered_map<ImGuiID, float> g_values;
 
 ImVec4 color(ImU32 value) {
@@ -55,6 +64,69 @@ void add_font(int index, const char* name) {
     config.OversampleH = 2;
     config.OversampleV = 2;
     g_fonts[index] = ImGui::GetIO().Fonts->AddFontFromMemoryTTF(const_cast<char*>(data.data()), static_cast<int>(data.size()), size::kBody, &config);
+}
+
+// (the glyph ranges: the letters of every translation, in the form ImGui wants, kept as long as the fonts are)
+std::vector<ImWchar> g_ranges;
+
+// The letters of every translation, as glyph ranges: every one of them is in the atlas from the first frame,
+// which is what a text drawn straight to a draw list (a heading, a row's words) needs.
+void make_ranges() {
+    g_ranges.clear();
+    for (unsigned point : recomp::i18n::translation_codepoints()) {
+        // (a range a letter, as the atlas takes them: two values each, ending in 0)
+        g_ranges.push_back(static_cast<ImWchar>(point));
+        g_ranges.push_back(static_cast<ImWchar>(point));
+    }
+    g_ranges.push_back(0);
+}
+
+// A font with Chinese glyphs, merged into the face just added: Inter has none, so without it Chinese is boxes.
+// The font is not compiled in (a full CJK font is several megabytes): it is read from beside the program, or
+// from the system's own.
+//
+// (MergeMode merges into the last face added, so this must come straight after that face's own AddFont, one
+// face at a time: a single loop over both would put every merge into the second face.)
+void add_cjk_merge() {
+    if (g_cjk_font.empty() || g_ranges.empty()) {
+        return;
+    }
+    ImFontConfig config;
+    config.MergeMode = true;
+    config.OversampleH = 2;
+    config.OversampleV = 2;
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(g_cjk_font.c_str(), size::kBody, &config, g_ranges.data());
+}
+
+// Where a font with Chinese glyphs is: beside the program (fonts/cjk.ttf, which a release may carry), else
+// the system's own. Empty: none, and Chinese is drawn as boxes.
+std::string find_cjk_font() {
+    std::vector<std::filesystem::path> places;
+    if (const char* base = SDL_GetBasePath()) {
+        places.push_back(std::filesystem::u8path(base) / "fonts" / "cjk.ttf");
+        places.push_back(std::filesystem::u8path(base) / "cjk.ttf");
+        SDL_free(const_cast<char*>(base));
+    }
+#ifdef _WIN32
+    places.push_back("C:/Windows/Fonts/msyh.ttc");     // Microsoft YaHei
+    places.push_back("C:/Windows/Fonts/simhei.ttf");   // SimHei
+#elif defined(__APPLE__)
+    places.push_back("/System/Library/Fonts/PingFang.ttc");
+    places.push_back("/System/Library/Fonts/STHeiti Medium.ttc");
+    places.push_back("/System/Library/Fonts/Supplemental/Songti.ttc");
+#else
+    places.push_back("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc");
+    places.push_back("/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc");
+    places.push_back("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc");
+    places.push_back("/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf");
+#endif
+    std::error_code missing;
+    for (const std::filesystem::path& place : places) {
+        if (std::filesystem::exists(place, missing)) {
+            return place.u8string();
+        }
+    }
+    return {};
 }
 
 // The ring round whatever the arrow keys or a gamepad are on (nothing while the mouse is in use); `rounding`
@@ -166,8 +238,72 @@ void apply_style(float value) {
 
 void load_fonts() {
     ImGui::GetIO().Fonts->Clear();
+    g_cjk_font = find_cjk_font();
+    // (Chinese needs a font of its own, merged into each face right after it: only when it is the language)
+    const bool chinese = recomp::i18n::language() == recomp::i18n::Language::Chinese;
+    if (chinese) {
+        make_ranges();
+    }
     add_font(0, "font_regular");
+    if (chinese) {
+        add_cjk_merge();
+    }
     add_font(1, "font_semibold");
+    if (chinese) {
+        add_cjk_merge();
+    }
+}
+
+// The letters of every translation, laid out once (which is what adds a glyph to the atlas): a text drawn
+// straight to a draw list (a page's heading, a row's words, a button's label) does not add its glyphs, and
+// without them it draws "?" until something else has. Called in a frame, after NewFrame.
+namespace {
+bool g_glyphs_asked = false;
+}
+
+void preload_translation_glyphs() {
+    if (g_glyphs_asked || recomp::i18n::language() != recomp::i18n::Language::Chinese) {
+        return;
+    }
+    g_glyphs_asked = true;
+    const std::string letters = recomp::i18n::translation_text();
+    for (int index = 0; index < 2; index++) {
+        if (g_fonts[index]) {
+            push_font(index == 1 ? Font::Semibold : Font::Regular, size::kBody);
+            ImGui::CalcTextSize(letters.c_str());  // (the layout is what bakes the glyphs, not this size)
+            pop_font();
+        }
+    }
+    if (const char* debug = std::getenv("RECOMP_LAUNCHER_I18N_DEBUG")) {
+        (void)debug;
+        std::fprintf(stderr, "[i18n] letters=%zu font=%s\n", letters.size(), g_cjk_font.c_str());
+        for (int index = 0; index < 2; index++) {
+            if (!g_fonts[index]) {
+                continue;
+            }
+            push_font(index == 1 ? Font::Semibold : Font::Regular, size::kBody);
+            ImFontBaked* baked = ImGui::GetFontBaked();
+            int have = 0, missing = 0;
+            for (const char* at = letters.c_str(); *at;) {
+                unsigned int cp = 0;
+                const int bytes = ImTextCharFromUtf8(&cp, at, nullptr);
+                if (bytes <= 0) {
+                    break;
+                }
+                at += bytes;
+                if (cp < 0x80) {
+                    continue;
+                }
+                if (baked->FindGlyphNoFallback(static_cast<ImWchar>(cp))) {
+                    have++;
+                } else {
+                    missing++;
+                }
+            }
+            std::fprintf(stderr, "[i18n] font %d: have=%d missing=%d\n", index, have, missing);
+            pop_font();
+        }
+    }
 }
 
 void begin_frame(float delta) {
@@ -233,6 +369,7 @@ void pop_font() {
 }
 
 void text(const char* value, Font font, float value_size, ImU32 text_color, float wrap) {
+    value = recomp::i18n::tr(value);
     push_font(font, value_size);
     ImGui::PushStyleColor(ImGuiCol_Text, text_color);
     if (wrap > 0.0f) {
@@ -247,6 +384,7 @@ void text(const char* value, Font font, float value_size, ImU32 text_color, floa
 }
 
 ImVec2 text_size(const char* value, Font font, float value_size, float wrap) {
+    value = recomp::i18n::tr(value);
     push_font(font, value_size);
     ImVec2 result = ImGui::CalcTextSize(value, nullptr, false, wrap > 0.0f ? wrap : -1.0f);
     pop_font();
@@ -283,10 +421,12 @@ void gap(float value) {
 bool button(const char* label, Kind kind, float width, bool enabled, float height) {
     ImGuiWindow* window = ImGui::GetCurrentWindow();
     ImGuiID id = window->GetID(label);
-    const char* end = ImGui::FindRenderedTextEnd(label);
+    // (the id is the label as written, so that a translation does not change it)
+    const char* shown_label = recomp::i18n::tr(label);
+    const char* end = ImGui::FindRenderedTextEnd(shown_label);
     float font_size = height >= 44.0f ? 16.0f : size::kBody;
     push_font(Font::Semibold, font_size);
-    ImVec2 label_size = ImGui::CalcTextSize(label, end);
+    ImVec2 label_size = ImGui::CalcTextSize(shown_label, end);
     ImVec2 box(std::max(px(width), label_size.x + px(40)), px(height));
     ImRect rect(window->DC.CursorPos, window->DC.CursorPos + box);
     bool hovered = false;
@@ -313,7 +453,7 @@ bool button(const char* label, Kind kind, float width, bool enabled, float heigh
     ImRect shown = pressed_rect(rect, press);
     window->DrawList->AddRectFilled(shown.Min, shown.Max, fade(fill, alpha), (shown.Max.y - shown.Min.y) * 0.5f);
     ImVec2 at(std::round(rect.Min.x + (box.x - label_size.x) * 0.5f), std::round(rect.Min.y + (box.y - label_size.y) * 0.5f));
-    window->DrawList->AddText(at, fade(ink, alpha), label, end);
+    window->DrawList->AddText(at, fade(ink, alpha), shown_label, end);
     pop_font();
     focus_ring(rect, id, box.y * 0.5f);
     return pressed;
@@ -368,7 +508,7 @@ bool dropdown(const char* id_text, const std::vector<std::string>& labels, int& 
     float hover = animate(id + 1, hovered || open ? 1.0f : 0.0f, 22.0f);
     window->DrawList->AddRectFilled(rect.Min, rect.Max, mix(p.control, p.control_hover, hover), px(10));
     push_font(Font::Regular, size::kBody);
-    const char* current = index >= 0 && index < static_cast<int>(labels.size()) ? labels[static_cast<size_t>(index)].c_str() : "";
+    const char* current = index >= 0 && index < static_cast<int>(labels.size()) ? recomp::i18n::tr(labels[static_cast<size_t>(index)].c_str()) : "";
     float line = ImGui::GetFontSize();
     window->DrawList->AddText(ImVec2(rect.Min.x + px(14), std::round(rect.Min.y + (box.y - line) * 0.5f)), p.text, current);
     pop_font();
@@ -433,7 +573,7 @@ bool search_box(const char* id_text, char* buffer, size_t size, const char* hint
         ImGui::ClearActiveID();
     }
     ImGui::SetNextItemWidth(box.x - px(34 + 36));
-    bool changed = ImGui::InputTextWithHint(id_text, hint, buffer, size, ImGuiInputTextFlags_EscapeClearsAll);
+    bool changed = ImGui::InputTextWithHint(id_text, recomp::i18n::tr(hint), buffer, size, ImGuiInputTextFlags_EscapeClearsAll);
     if (g_focus_next) {
         g_focus_next = false;
         focus_item();
@@ -484,7 +624,7 @@ bool text_field(const char* id_text, char* buffer, size_t size, const char* hint
         ImGui::ClearActiveID();
     }
     ImGui::SetNextItemWidth(box.x - px(24));
-    bool changed = ImGui::InputTextWithHint(id_text, hint, buffer, size);
+    bool changed = ImGui::InputTextWithHint(id_text, recomp::i18n::tr(hint), buffer, size);
     if (g_focus_next) {
         g_focus_next = false;
         focus_item();
@@ -511,7 +651,7 @@ bool nav_item(const char* label, bool active, float width, bool reachable, float
     window->DrawList->AddRectFilled(rect.Min, rect.Max, fade(p.control, hover * 0.6f), px(10));
     Font font = on > 0.5f ? Font::Semibold : Font::Regular;
     float chevron = fold >= 0 ? px(22) : 0.0f;
-    std::string shown = fit_end(label, font, size::kBody, box.x - px(16) - px(indent) - chevron);  // (a long name in a narrow sidebar)
+    std::string shown = fit_end(recomp::i18n::tr(label), font, size::kBody, box.x - px(16) - px(indent) - chevron);  // (a long name in a narrow sidebar)
     push_font(font, size::kBody);
     float line = ImGui::GetFontSize();
     window->DrawList->AddText(ImVec2(rect.Min.x + px(14) + px(indent), std::round(rect.Min.y + (box.y - line) * 0.5f)), mix(p.secondary, p.text, on),
@@ -548,7 +688,7 @@ bool list_item(const char* label, bool active, float width) {
     window->DrawList->AddRectFilled(rect.Min, rect.Max, mix(fade(p.control, hover * 0.7f), p.control_hover, on), px(8));
     push_font(active ? Font::Semibold : Font::Regular, size::kBody);
     float line = ImGui::GetFontSize();
-    window->DrawList->AddText(ImVec2(rect.Min.x + px(12), std::round(rect.Min.y + (box.y - line) * 0.5f)), p.text, label);
+    window->DrawList->AddText(ImVec2(rect.Min.x + px(12), std::round(rect.Min.y + (box.y - line) * 0.5f)), p.text, recomp::i18n::tr(label));
     pop_font();
     focus_ring(rect, id, px(8), true);
     return pressed;

@@ -145,6 +145,23 @@ std::filesystem::path player_folder(const char* name, const char* home_env) {
     return system_folder(name);  // where the game keeps settings.ini too
 }
 
+} // namespace
+
+// (launcher.h: the language, before anything is drawn: it decides the font and the words)
+void launcher::load_language() {
+    // (the port's table first: the language is chosen from it)
+#ifdef LAUNCHER_COLLECTION
+    recomp::i18n::set_translations(launcher::describe_collection().games.front().description.translations);
+#else
+    recomp::i18n::set_translations(launcher::describe().translations);
+#endif
+    recomp::Ini prefs(player_folder(LAUNCHER_GAME_NAME, LAUNCHER_HOME_ENV) / "launcher.ini");
+    prefs.load();
+    recomp::i18n::set_language(prefs.get("launcher", "language"));
+}
+
+namespace {
+
 // A folder as a file:// URL, for the system to open
 std::string file_url(const std::filesystem::path& folder) {
     std::string url = "file://";
@@ -1905,6 +1922,44 @@ void App::display_cards(size_t which, float width) {
         }
         sound.end();
     }
+    language_card(width);
+}
+
+// The language the launcher and the games are drawn in: one row, kept in launcher.ini ([launcher] language),
+// which the game reads too. The languages are the port's table's (i18n.h); English alone: no row.
+void App::language_card(float width) {
+    const std::vector<recomp::i18n::Language>& languages = recomp::i18n::languages();
+    if (languages.size() < 2) {
+        return;
+    }
+    ui::gap(24);
+    layout::label("LANGUAGE");
+    Card card(width);
+    std::vector<std::string> names;
+    int chosen = 0;
+    for (size_t i = 0; i < languages.size(); i++) {
+        names.push_back(recomp::i18n::name(languages[i]));
+        if (languages[i] == recomp::i18n::language()) {
+            chosen = static_cast<int>(i);
+        }
+    }
+    row(width, "Language", "What the launcher and the games' own menus are drawn in.", 190.0f, 36.0f, [&] {
+        if (ui::dropdown("##language", names, chosen, 190.0f)) {
+            set_language(languages[static_cast<size_t>(chosen)]);
+        }
+    });
+    card.end();
+}
+
+void App::set_language(recomp::i18n::Language language) {
+    if (language == recomp::i18n::language()) {
+        return;
+    }
+    recomp::i18n::set_language(language);
+    prefs_.set("launcher", "language", recomp::i18n::code(language));
+    prefs_.save();
+    // (the font: Chinese is drawn in one of its own, merged into the launcher's)
+    ui::load_fonts();
 }
 
 // Play, what went wrong with the last start, and (Linux) Add to Steam
@@ -3663,6 +3718,10 @@ void App::features_page(float width) {
             set_preset(kPresetNames[index]);
         }
         ui::gap(26);
+    }
+    // (a launcher with no Game page and no Display card, a collection's: the language is here)
+    if (!about_.game_page) {
+        language_card(width);
     }
 
     if (!collection_) {
