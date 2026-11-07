@@ -251,6 +251,23 @@ A toolkit change is checked with every game: build each (`make GAME=<id>`) and r
 that game's `game.cfg` or `src/`, not in the toolkit. A feature more than one game has should have the same
 name and choices in each: the collection's launcher then shows it once, for all of them.
 
+## Languages
+
+The launcher and the game are drawn in the player's language, kept in `launcher.ini`'s `[launcher] language` and
+chosen on the Game page's Language row (on the Features page where a launcher has no Game page). English is what the
+code writes; `port/i18n_table.cpp` has each English text and its Chinese, and both programs install it before they
+draw (`recomp-common/i18n.h`: `recomp::i18n::set_translations`). A text with no row is drawn in English, so a row
+upstream changed is unused rather than a build error, and a new feature needs no change to the launcher.
+
+Chinese is drawn in a face read at run time from `fonts/cjk.ttf` beside the program, else the system's own (macOS,
+Windows, the common Linux paths). It is not compiled in (a full CJK face is tens of megabytes) and not committed: a
+release that would rather not depend on the system's fonts ships one in `fonts/`, and the licence with it. The table's
+letters are that face's glyph ranges, so every one is in the atlas from the first frame.
+
+The in-game menu stays in English: `recomp-common/text.h` is a 5x7 dot matrix with ASCII only, and a CJK face at that
+size is unreadable, so `Menu::Draw` draws untranslated (`i18n::Untranslated`) rather than "?" for every letter. Making
+it Chinese means a bitmap font of the letters the menu uses, drawn as the menu draws now (`Canvas::Chars`).
+
 ## Wanted
 
 - **The picture native at the game's level**, not a model of the board's video chips: the games' drawing code hands

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **中文界面**：启动器可以显示中文，入口是「游戏」页底部的「语言」行（没有「游戏」页的启动器上，在「功能」页）。
+  选择保存在 `launcher.ini` 的 `[launcher] language`，英文与中文实时切换。文案表在 `port/i18n_table.cpp`：一行一个
+  英文原文和它的中文，查不到时显示英文，所以上游改了英文只会让那一行失效，不会导致构建失败。中文由运行时读取的
+  中文字体绘制（程序旁的 `fonts/cjk.ttf`，否则用系统自带的），不编进程序、不进仓库。游戏内菜单保持英文：它用的是
+  5x7 点阵字体，只有英文字母（见 [TOOLKIT.md](docs/TOOLKIT.md)）。
 - **Favourite stages**: in the in-game menu, Enter or A on a list of stages (training's, the stage viewer's, the endless
   and team battles') marks the stage shown a favourite (a `*` after it), and a **Favourites** row under the list goes
   through the favourites alone. The same favourites in every list, kept in settings.ini.
