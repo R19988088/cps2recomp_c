@@ -1912,13 +1912,15 @@ void App::file_card(size_t which, float width) {
     Card card(width);
     const bool download = !one.about->download.files.empty();
     const bool usable = !one.file_path.empty() && !one.checking && file.usable();
-    std::string shown = one.file_path.empty() ? (download && !one.about->download.detail.empty() ? one.about->download.detail
-                                                                                                : std::string(one.about->file_empty))
-                                             : one.file_path;
-    float controls = 130.0f;
-    if (download && !usable) {
-        controls = 270.0f;  // (Download, and Replace… once a download was not the right one)
+    const bool failed = !one.file_path.empty() && !one.checking && !file.usable();
+    std::string shown;
+    if (!one.file_path.empty()) {
+        shown = one.file_path;
+    } else {
+        shown = download && !one.about->download.detail.empty() ? one.about->download.detail : std::string(one.about->file_empty);
     }
+    // (two buttons: Download and, beside it, Replace… — only once a file that was got is not the right one)
+    float controls = download && failed ? 270.0f : 130.0f;
     shown = ui::fit_start(shown, Font::Regular, ui::size::kBody, width - px(controls) - px(70));
     std::string status;
     double fraction = -1.0;
@@ -1926,7 +1928,10 @@ void App::file_card(size_t which, float width) {
     if (one.checking) {
         status = "Checking…";
     } else if (one.downloading) {
-        status = fraction >= 0.0 ? "Downloading… " + std::to_string(static_cast<int>(fraction * 100.0f)) + "%" : "Downloading…";
+        status = recomp::i18n::tr("Downloading…");
+        if (fraction >= 0.0) {
+            status += " " + std::to_string(static_cast<int>(fraction * 100.0f)) + "%";
+        }
     } else if (!said.empty()) {
         status = said;  // (why the download did not work)
     } else if (!one.file_path.empty()) {
@@ -3125,7 +3130,7 @@ void App::library_page(float width) {
         const bool download = !one.about->download.files.empty();
         const std::string said = download_status(which);
         std::string status = one.checking ? std::string("Checking…")
-                             : one.downloading ? std::string("Downloading…")
+                             : one.downloading ? std::string(recomp::i18n::tr("Downloading…"))
                              : !said.empty() ? said
                              : one.file_path.empty() ? std::string(one.about->file_empty)
                                                      : file.message;
