@@ -58,6 +58,8 @@ const std::vector<Translation> kChinese = {
     {"Play", "开始游戏"},
     {"Playing…", "游戏中…"},
     {"Choose…", "选择…"},
+    {"Replace…", "更换…"},
+    {"Downloading…", "下载中…"},
     {"Choose folder…", "选择文件夹…"},
     {"Add ROM sets…", "添加 ROM 集…"},
     {"Use this folder", "使用此文件夹"},

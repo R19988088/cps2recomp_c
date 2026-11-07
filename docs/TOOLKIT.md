@@ -259,10 +259,11 @@ code writes; `port/i18n_table.cpp` has each English text and its Chinese, and bo
 draw (`recomp-common/i18n.h`: `recomp::i18n::set_translations`). A text with no row is drawn in English, so a row
 upstream changed is unused rather than a build error, and a new feature needs no change to the launcher.
 
-Chinese is drawn in a face read at run time from `fonts/cjk.ttf` beside the program, else the system's own (macOS,
-Windows, the common Linux paths). It is not compiled in (a full CJK face is tens of megabytes) and not committed: a
-release that would rather not depend on the system's fonts ships one in `fonts/`, and the licence with it. The table's
-letters are that face's glyph ranges, so every one is in the atlas from the first frame.
+Chinese is drawn in the system's own font, on every platform: macOS's PingFang, Heiti or Songti; Windows' Microsoft
+YaHei, SimHei or SimSun; on Linux the distribution's Noto CJK, WenQuanYi or Droid Sans Fallback, in the folders fonts
+are installed into. Nothing is compiled in (a full CJK face is tens of megabytes), nothing is shipped beside the
+program, and no app bundle carries one: every system this runs on has such a font already. The table's letters are
+that face's glyph ranges, so every one is in the atlas from the first frame.
 
 The in-game menu stays in English: `recomp-common/text.h` is a 5x7 dot matrix with ASCII only, and a CJK face at that
 size is unreadable, so `Menu::Draw` draws untranslated (`i18n::Untranslated`) rather than "?" for every letter. Making

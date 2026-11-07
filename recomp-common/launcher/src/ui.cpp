@@ -82,8 +82,8 @@ void make_ranges() {
 }
 
 // A font with Chinese glyphs, merged into the face just added: Inter has none, so without it Chinese is boxes.
-// The font is not compiled in (a full CJK font is several megabytes): it is read from beside the program, or
-// from the system's own.
+// The font is the system's own, on every platform (a macOS app, a Windows install and a Linux distribution all
+// carry one): nothing is shipped with the program and nothing is compiled in.
 //
 // (MergeMode merges into the last face added, so this must come straight after that face's own AddFont, one
 // face at a time: a single loop over both would put every merge into the second face.)
@@ -98,31 +98,46 @@ void add_cjk_merge() {
     ImGui::GetIO().Fonts->AddFontFromFileTTF(g_cjk_font.c_str(), size::kBody, &config, g_ranges.data());
 }
 
-// Where a font with Chinese glyphs is: beside the program (fonts/cjk.ttf, which a release may carry), beside the
-// program's bundle (a macOS app's Contents/Resources/fonts/cjk.ttf), else the system's own. Empty: none, and
-// Chinese is drawn as boxes.
+// Where the system's font with Chinese glyphs is. Empty: none found, and Chinese is drawn as boxes.
+//
+// The paths are the ones each system has by default, most preferred first: macOS's PingFang, Heiti and Songti;
+// Windows' Microsoft YaHei and SimHei; on Linux, the distribution folders fonts are put in (Noto CJK, WenQuanYi,
+// Droid Sans Fallback) plus a look through a user's own font folder for any of them.
 std::string find_cjk_font() {
     std::vector<std::filesystem::path> places;
-    if (const char* base = SDL_GetBasePath()) {
-        const std::filesystem::path folder = std::filesystem::u8path(base);
-        places.push_back(folder / "fonts" / "cjk.ttf");
-        places.push_back(folder / "cjk.ttf");
-        // (a macOS bundle: SDL's base path is Contents/MacOS, the fonts are in Contents/Resources)
-        places.push_back(folder / ".." / "Resources" / "fonts" / "cjk.ttf");
-        // (not freed: since SDL 3.4 this is the library's own copy, freed by SDL_Quit)
-    }
 #ifdef _WIN32
-    places.push_back("C:/Windows/Fonts/msyh.ttc");     // Microsoft YaHei
-    places.push_back("C:/Windows/Fonts/simhei.ttf");   // SimHei
+    // (the system folder, wherever Windows was installed)
+    const char* windir = std::getenv("WINDIR");
+    const std::string fonts = std::string(windir && *windir ? windir : "C:/Windows") + "/Fonts/";
+    places.push_back(fonts + "msyh.ttc");    // Microsoft YaHei
+    places.push_back(fonts + "msyh.ttf");
+    places.push_back(fonts + "simhei.ttf");  // SimHei
+    places.push_back(fonts + "simsun.ttc");  // SimSun
 #elif defined(__APPLE__)
     places.push_back("/System/Library/Fonts/PingFang.ttc");
+    places.push_back("/System/Library/Fonts/Hiragino Sans GB.ttc");
     places.push_back("/System/Library/Fonts/STHeiti Medium.ttc");
+    places.push_back("/System/Library/Fonts/STHeiti Light.ttc");
     places.push_back("/System/Library/Fonts/Supplemental/Songti.ttc");
 #else
-    places.push_back("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc");
-    places.push_back("/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc");
-    places.push_back("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc");
-    places.push_back("/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf");
+    for (const char* dir : {"/usr/share/fonts", "/usr/local/share/fonts", "/run/host/fonts"}) {
+        const std::filesystem::path root(dir);
+        places.push_back(root / "opentype/noto/NotoSansCJK-Regular.ttc");
+        places.push_back(root / "opentype/noto/NotoSansCJKsc-Regular.otf");
+        places.push_back(root / "noto-cjk/NotoSansCJK-Regular.ttc");
+        places.push_back(root / "truetype/noto/NotoSansCJK-Regular.ttc");
+        places.push_back(root / "truetype/wqy/wqy-microhei.ttc");
+        places.push_back(root / "truetype/wqy/wqy-zenhei.ttc");
+        places.push_back(root / "truetype/droid/DroidSansFallbackFull.ttf");
+        places.push_back(root / "truetype/arphic/uming.ttc");
+    }
+    // (a user's own: the folders fonts are usually installed into by hand)
+    if (const char* home = std::getenv("HOME")) {
+        const std::filesystem::path own = std::filesystem::path(home) / ".local/share/fonts";
+        places.push_back(own / "NotoSansCJK-Regular.ttc");
+        places.push_back(own / "NotoSansCJKsc-Regular.otf");
+        places.push_back(own / "wqy-microhei.ttc");
+    }
 #endif
     std::error_code missing;
     for (const std::filesystem::path& place : places) {

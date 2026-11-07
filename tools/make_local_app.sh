@@ -3,11 +3,12 @@
 # Copyright (C) 2026 Tommy McLeroy. Part of cps2recomp.
 #
 # A macOS app built on this machine, from whatever has been built here, in dist/: the launcher, the game
-# programs beside it, SDL3, and a Chinese font. No ROM set goes in (the launcher reads the player's own).
+# programs beside it and SDL3. No ROM set goes in (the launcher reads the player's own).
 #
 #   tools/make_local_app.sh          the collection if build/collection has it, else the stand-in game (example)
 #   B=folder                         where the programs are (build/collection or build/example)
-#   CJK_FONT=path/to/font.ttf        the Chinese font to carry (else the system's own is used)
+#
+# Chinese is drawn in the system's own font (docs/TOOLKIT.md): no font goes in the bundle.
 #
 # Built from the source tree, a bundle is not a release's download: it has no update source (see
 # launcher/CMakeLists.txt), so it never replaces itself with another project's release.
@@ -26,13 +27,6 @@ if [ -z "${B:-}" ]; then
 fi
 echo "app from $B"
 
-# (a font the bundle can carry: the first the system has, unless CJK_FONT names one)
-if [ -z "${CJK_FONT:-}" ]; then
-    for font in /System/Library/Fonts/Supplemental/Songti.ttc /System/Library/Fonts/STHeiti\ Medium.ttc; do
-        [ -f "$font" ] && { CJK_FONT="$font"; break; }
-    done
-fi
-export CJK_FONT
 export FORCE=1 B
 
 # (make_app.sh reads games/<id>/game.cfg from the folder make runs in: the example's own tree for the stand-in)
