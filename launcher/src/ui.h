@@ -91,6 +91,8 @@ bool text_field(const char* id, char* buffer, size_t size, const char* hint, flo
 // `indent`: its words further in (a row under another's). `fold`: a row that opens and closes the rows under it shows a
 // chevron at its end, pointing right while it is closed (0) and down while it is open (1); -1: none.
 bool nav_item(const char* label, bool active, float width, bool reachable = true, float indent = 0.0f, int fold = -1);
+// A round button with a circular arrow in it, to look again (a folder, say): `size` is its diameter
+bool refresh_button(const char* id, float size = 36.0f, bool enabled = true);
 bool list_item(const char* label, bool active, float width);
 bool key_chip(const char* id, const char* label, bool capturing, float width, ImRect& rect);
 float keycap(const char* key);

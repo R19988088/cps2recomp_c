@@ -5,12 +5,6 @@ a minor version. A port's copy only changes when it runs `tools/sync-common.sh`.
 
 ## Unreleased
 
-- **Downloading the game file** (`Description::download`, `src/download.h`): a port that knows where its file can be got
-  gives the launcher the URLs and the names to write them under (into the player's folder's `roms/`), and the Game page
-  has **Download** in place of Choose…, the card saying how far it has got. A downloaded file is checked as any chosen
-  one is; one that is not the right file (another release, a download that went wrong) has **Replace…** beside
-  Download, which opens the player's own file dialog as the way out. Downloads use the system's curl, and Android's
-  HTTP as the updates do.
 - **The words a port draws, in the player's language** (`src/i18n.h`): a port gives its `Description` a table of
   English text and its translation (`Description::translations`); the launcher's drawing code (`ui::text`, `button`,
   `dropdown`, `nav_item`, `list_item`, `layout::heading`) asks `tr()` for each, so a row whose English upstream changed
