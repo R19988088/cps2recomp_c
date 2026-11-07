@@ -2606,7 +2606,14 @@ bool ParseArgs(int argc, char **argv, port::Options &o) {
             o.stats = true;
         } else if (a == "--list-features") {
             // For the launcher: one optional feature per line (recomp-common/settings.h; the ones that last a
-            // session, switched in the game's menu only, are not in it)
+            // session, switched in the game's menu only, are not in it). In the player's language: the launcher
+            // keeps it in launcher.ini, which this program reads here too, before the list is written.
+            recomp::i18n::set_translations(PortTranslations());
+            {
+                recomp::Ini prefs(port::LauncherFolder() / "launcher.ini");
+                prefs.load();
+                recomp::i18n::set_language(prefs.get("launcher", "language"));
+            }
             fputs(port::LauncherFeatureList().c_str(), stdout);
             exit(0);
         } else if (a == "--list-songs") {

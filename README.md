@@ -11,8 +11,9 @@ mode, online play with rollback, widescreen and new modes.
 
 **[Get started →](#getting-started)**
 
-**No game files are included.** You need your own copy of each game: its arcade ROM set (a CPS-2 game's with its key
-file). Only the versions named below work for each game, and this project cannot help you get one.
+**No game files are included.** Each game needs its arcade ROM set (a CPS-2 game's with its key file). The launcher
+can download the set from the MAME 0.245 split set on archive.org, or use your own copy; only the versions named
+below work for each game.
 
 ![The model viewer: Psylocke at 1.5x, going through her animations](docs/screenshots/msh/model-viewer-psylocke.gif)
 
@@ -122,10 +123,14 @@ each other.
 
 1. Download the build for your system from the [releases page](https://github.com/tmcleroy/cps2recomp/releases) and
    unpack it.
-2. Open the launcher (`CPS-2 Recomp.app`, `cps2recomp-launcher`). On its Games page, **Choose folder…** and pick the
-   folder you keep your ROM sets in: it finds each game's set by name (`sfa2u.zip` or a folder of the set's files).
-   Your ROM sets are only ever read.
+2. Open the launcher (`CPS-2 Recomp.app`, `cps2recomp-launcher`). Each game's page has **Download**, which fetches its
+   ROM set (and the parent set's zip a split collection keeps the shared files in) into the launcher's own folder.
+   **Choose folder…** on the Games page still works for sets you keep yourself: it finds each game's by name
+   (`sfa2u.zip` or a folder of the set's files). Your own ROM sets are only ever read.
 3. Press **Play** beside a game.
+
+A downloaded set is checked like any other: if its files are not the ones the port was made from, the card says what
+is wrong and **Replace…** appears beside **Download**, to choose your own copy of the set.
 
 While playing, Esc or `F1` opens the in-game menu (on a gamepad: the left stick's click, or Start and Select
 together).
@@ -139,8 +144,8 @@ together).
 
 1. Download `CPS2Recomp-android.apk` from the releases page on your phone or tablet and open it to install it
    (Android 9 or later, 64-bit ARM; allow installs from your browser or file manager when asked).
-2. Open CPS-2 Recomp and press **Add ROM sets…** on its Games page: choose your sets' zips, as many at once as you
-   like. They are copied into the app's folder.
+2. Open CPS-2 Recomp and press **Download** on a game's page: its ROM set is fetched into the app's folder. Sets you
+   have yourself: **Add ROM sets…** on the Games page copies them in.
 3. Press **Play** beside a game.
 
 The games show a stick and buttons on the screen; a gamepad connected over Bluetooth or USB works too, and takes their
@@ -150,14 +155,15 @@ place. Back, or the screen's **Menu**, opens the in-game menu.
 
 1. In Desktop Mode, download `CPS2Recomp-linux-x86_64.tar.gz` from the releases page, extract it, and move the
    `CPS2Recomp` folder somewhere it can stay (a new `Applications` folder in your home folder, say).
-2. Copy your ROM sets into one folder on the Deck.
-3. Open `cps2recomp-launcher`, **Choose folder…** on the Games page, and pick that folder.
-4. On each game's page, press **Add to Steam**. The games then appear in Gaming Mode under **Non-Steam**.
+2. Open `cps2recomp-launcher` and press **Download** on a game's page (or **Choose folder…** on the Games page for
+   sets you copied to the Deck).
+3. On each game's page, press **Add to Steam**. The games then appear in Gaming Mode under **Non-Steam**.
 
 ## What you need
 
-- The ROM set of each game you want, as named in the table above: a zip (with its parent set's zip beside it if your
-  collection keeps the shared files there) or a folder of its files. The launcher checks every file and says which
+- The ROM set of each game you want, as named in the table above (the launcher downloads it, or you choose it): a
+  zip (with its parent set's zip beside it if your collection keeps the shared files there) or a folder of its files.
+  The launcher checks every file and says which
   is missing or different. **Other regions** of the same release work too, played as the board plays in that region:
   the Marvel games', Super Gem Fighter's (*Pocket Fighter* in Japan), Puzzle Fighter's, Alpha's, Alpha 3's, Super
   Turbo's, Alien vs. Predator's and Giga Wing's; each game's page names them. Other revisions don't work: each port is made from

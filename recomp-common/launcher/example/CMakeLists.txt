@@ -26,5 +26,5 @@ set(LAUNCHER_VERSION 0.0.0)
 include(../launcher.cmake)
 
 # The stand-in for the game program, beside the launcher
-add_executable(example game.cpp ${RECOMP_COMMON_SRC}/settings.cpp)
+add_executable(example game.cpp ${RECOMP_COMMON_SRC}/settings.cpp ${RECOMP_COMMON_SRC}/i18n.cpp)
 target_include_directories(example PRIVATE ${RECOMP_COMMON_SRC})
