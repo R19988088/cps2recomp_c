@@ -77,9 +77,12 @@ std::string fetch_problem(int code) {
     case -1: return "the download could not be started (is curl there?)";
     case 6:
     case 7: return "no connection to the internet";
+    case 18: return "the connection was cut short partway through";
     case 22: return "the file was not found on the server";
     case 23: return "the file could not be written where it belongs";
     case 28: return "the connection timed out";
+    case 35: return "the connection failed";
+    case 56: return "the connection was cut short";
     default: return "the download failed (curl " + std::to_string(code) + ")";
     }
 }
