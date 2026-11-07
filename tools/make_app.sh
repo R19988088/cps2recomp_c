@@ -65,6 +65,15 @@ else
     echo "warning: no shaders in $APP (tools/librashader.sh failed)" >&2
 fi
 
+# Chinese (docs/TOOLKIT.md): the font is not compiled in, so the bundle carries one when CJK_FONT names it; the
+# launcher also reads the system's own, so this only decides whether the bundle needs the system to have one.
+if [ -n "${CJK_FONT:-}" ] && [ -f "$CJK_FONT" ]; then
+    mkdir -p "$APP/Contents/Resources/fonts"
+    cp "$CJK_FONT" "$APP/Contents/Resources/fonts/cjk.ttf"
+else
+    echo "note: no Chinese font in $APP (CJK_FONT names one); the system's own is used" >&2
+fi
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

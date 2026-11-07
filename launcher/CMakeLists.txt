@@ -36,7 +36,12 @@ set(LAUNCHER_COLLECTION ${COLLECTION})
 if(COLLECTION)
     # (the collection updates itself from the releases: each system's manifest and archive, tools/release/lib.sh; the
     # Android app only says a new version is out, its Download the release's APK, which the system installs: #209)
-    set(LAUNCHER_UPDATE_REPO tmcleroy/cps2recomp)
+    #
+    # Empty by default: an update replaces the launcher's own files with the release's, so it must name the repository
+    # whose releases are this build's. Left pointing at another project's (this toolkit's upstream), a build made from
+    # a fork would replace itself with that project's version. Set it to the fork that publishes this build's
+    # releases, with -DLAUNCHER_UPDATE_REPO=owner/name, or leave it empty for a build of one's own.
+    set(LAUNCHER_UPDATE_REPO "" CACHE STRING "owner/name whose releases this build updates itself from (empty: none)")
     # (VERSION's, or the release scripts' COLLECTION_VERSION, which their manifests say too)
     if(COLLECTION_VERSION)
         set(LAUNCHER_VERSION ${COLLECTION_VERSION})
