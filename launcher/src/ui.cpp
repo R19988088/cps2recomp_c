@@ -98,13 +98,17 @@ void add_cjk_merge() {
     ImGui::GetIO().Fonts->AddFontFromFileTTF(g_cjk_font.c_str(), size::kBody, &config, g_ranges.data());
 }
 
-// Where a font with Chinese glyphs is: beside the program (fonts/cjk.ttf, which a release may carry), else
-// the system's own. Empty: none, and Chinese is drawn as boxes.
+// Where a font with Chinese glyphs is: beside the program (fonts/cjk.ttf, which a release may carry), beside the
+// program's bundle (a macOS app's Contents/Resources/fonts/cjk.ttf), else the system's own. Empty: none, and
+// Chinese is drawn as boxes.
 std::string find_cjk_font() {
     std::vector<std::filesystem::path> places;
     if (const char* base = SDL_GetBasePath()) {
-        places.push_back(std::filesystem::u8path(base) / "fonts" / "cjk.ttf");
-        places.push_back(std::filesystem::u8path(base) / "cjk.ttf");
+        const std::filesystem::path folder = std::filesystem::u8path(base);
+        places.push_back(folder / "fonts" / "cjk.ttf");
+        places.push_back(folder / "cjk.ttf");
+        // (a macOS bundle: SDL's base path is Contents/MacOS, the fonts are in Contents/Resources)
+        places.push_back(folder / ".." / "Resources" / "fonts" / "cjk.ttf");
         // (not freed: since SDL 3.4 this is the library's own copy, freed by SDL_Quit)
     }
 #ifdef _WIN32
