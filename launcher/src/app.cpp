@@ -1106,13 +1106,18 @@ void App::find_in(const std::string& path) {
         std::error_code error;
         std::filesystem::path given = std::filesystem::u8path(path);
         for (const auto& [which, about] : games) {
-            std::vector<std::filesystem::path> tries = {given};
-            if (about->candidates && std::filesystem::is_directory(given, error)) {
-                std::vector<std::filesystem::path> more = about->candidates(given);
-                tries.insert(tries.end(), more.begin(), more.end());
+            // (a folder's own candidates first: the set's zip and its parent's, by name, then the folder itself)
+            std::vector<std::filesystem::path> tries;
+            std::error_code error;
+            const bool directory = std::filesystem::is_directory(given, error);
+            if (directory && about->candidates) {
+                tries = about->candidates(given);
             }
+            tries.push_back(given);
             for (const std::filesystem::path& one : tries) {
-                if (std::filesystem::exists(one, error) && about->check(one.u8string()).usable()) {
+                std::error_code ignored;
+                if (std::filesystem::exists(one, ignored) && !std::filesystem::is_directory(one, ignored) &&
+                    about->check(one.u8string()).usable()) {
                     found.push_back({which, one.u8string()});
                     break;
                 }
@@ -1846,19 +1851,12 @@ void App::file_card(size_t which, float width) {
     card.end();
 }
 
-// The game file's button in its row, to choose another (a gamepad gets the launcher's own browser)
+// The game file's button in its row, to choose it or choose another (a gamepad gets the launcher's own browser)
 void App::file_buttons(size_t which, bool compact) {
     Slot& one = *slots_[which];
-    FileCheck file;
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        file = one.file;
-    }
     const bool busy = one.checking;
-    const bool usable = !one.file_path.empty() && !one.checking && file.usable();
     const float button = compact ? 110.0f : 130.0f;
-    std::string label = one.file_path.empty() || !usable ? "Choose…" : "Replace…";
-    if (ui::button(label.c_str(), Kind::Secondary, button, !busy)) {
+    if (ui::button("Choose…", Kind::Secondary, button, !busy)) {
         // (the system's file dialog wants a mouse or a keyboard)
         if (ui::gamepad_in_use()) {
             open_browser(which, false);
