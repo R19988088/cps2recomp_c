@@ -1966,7 +1966,7 @@ void App::file_buttons(size_t which, bool compact) {
     const bool manual = !download || usable || failed;
     if (download && !usable) {
         std::string label = one.downloading ? "Downloading…" : "Download";
-        if (ui::button((label + "###download").c_str(), Kind::Primary, button, !busy)) {
+        if (ui::button(label.c_str(), Kind::Primary, button, !busy)) {
             download_game_file(which);
         }
         if (manual) {
@@ -1975,7 +1975,7 @@ void App::file_buttons(size_t which, bool compact) {
     }
     if (manual) {
         std::string label = download ? "Replace…" : "Choose…";
-        if (ui::button((label + "###choose").c_str(), Kind::Secondary, button, !busy)) {
+        if (ui::button(label.c_str(), Kind::Secondary, button, !busy)) {
             // (the system's file dialog wants a mouse or a keyboard)
             if (ui::gamepad_in_use()) {
                 open_browser(which, false);
@@ -2501,7 +2501,7 @@ void App::online_page(float width) {
                     } else if (!file) {
                         const bool can_download = !one.about->download.files.empty();
                         std::string label = !can_download ? std::string("Add…") : one.downloading ? std::string("Downloading…") : std::string("Download");
-                        if (ui::button((label + "###add").c_str(), can_download ? Kind::Primary : Kind::Secondary, 130.0f,
+                        if (ui::button(label.c_str(), can_download ? Kind::Primary : Kind::Secondary, 130.0f,
                                        !(one.checking || one.downloading))) {
                             if (can_download) {
                                 download_game_file(which);
@@ -2599,7 +2599,7 @@ void App::online_page(float width) {
                     const Slot& needed = *slots_[static_cast<size_t>(join_needs_)];
                     const bool can_download = !needed.about->download.files.empty();
                     std::string label = !can_download ? std::string("Add…") : needed.downloading ? std::string("Downloading…") : std::string("Download");
-                    if (ui::button((label + "###add").c_str(), can_download ? Kind::Primary : Kind::Secondary, 130.0f,
+                    if (ui::button(label.c_str(), can_download ? Kind::Primary : Kind::Secondary, 130.0f,
                                    !(needed.checking || needed.downloading))) {
                         if (can_download) {
                             download_game_file(static_cast<size_t>(join_needs_));
@@ -2846,7 +2846,7 @@ void App::invitations_card(float width) {
                 const Slot& needed = *slots_[which];
                 const bool can_download = !needed.about->download.files.empty();
                 std::string label = !can_download ? std::string("Add…") : needed.downloading ? std::string("Downloading…") : std::string("Download");
-                if (ui::button((label + "###add").c_str(), can_download ? Kind::Primary : Kind::Secondary, 130.0f,
+                if (ui::button(label.c_str(), can_download ? Kind::Primary : Kind::Secondary, 130.0f,
                                !(needed.checking || needed.downloading))) {
                     if (can_download) {
                         download_game_file(which);
