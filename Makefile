@@ -28,14 +28,14 @@ $(B)/c_test: tests/c_test.c src/menu.cpp src/menu_c.cpp src/i18n.cpp src/menu_c.
 	$(CXX) $(CXXFLAGS) $(B)/c_test.o src/menu.cpp src/menu_c.cpp src/i18n.cpp -o $@
 
 # The settings rules (settings.h), and from C
-$(B)/settings_test: tests/settings_test.cpp src/settings.cpp src/settings.h
+$(B)/settings_test: tests/settings_test.cpp src/settings.cpp src/i18n.cpp src/settings.h src/i18n.h
 	@mkdir -p $(B)
-	$(CXX) $(CXXFLAGS) -fsanitize=address,undefined tests/settings_test.cpp src/settings.cpp -o $@
+	$(CXX) $(CXXFLAGS) -fsanitize=address,undefined tests/settings_test.cpp src/settings.cpp src/i18n.cpp -o $@
 
-$(B)/settings_c_test: tests/settings_c_test.c src/settings.cpp src/settings_c.cpp src/settings_c.h src/settings.h
+$(B)/settings_c_test: tests/settings_c_test.c src/settings.cpp src/settings_c.cpp src/i18n.cpp src/settings_c.h src/settings.h src/i18n.h
 	@mkdir -p $(B)
 	$(CC) -std=c99 -Wall -Wextra -Wpedantic -Isrc -c tests/settings_c_test.c -o $(B)/settings_c_test.o
-	$(CXX) $(CXXFLAGS) $(B)/settings_c_test.o src/settings.cpp src/settings_c.cpp -o $@
+	$(CXX) $(CXXFLAGS) $(B)/settings_c_test.o src/settings.cpp src/settings_c.cpp src/i18n.cpp -o $@
 
 # The proxy Windows is set to use, for curl (proxy.h)
 $(B)/proxy_test: tests/proxy_test.cpp src/proxy.h

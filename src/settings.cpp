@@ -2,6 +2,8 @@
 // Copyright (C) 2026 Tommy McLeroy. Part of recomp-common: https://github.com/tmcleroy/recomp-common
 #include "settings.h"
 
+#include "i18n.h"
+
 #include <algorithm>
 #include <cstdlib>
 #include <fstream>
@@ -155,9 +157,12 @@ std::string FeatureListText(const std::vector<FeatureInfo> &features) {
         if (feature.flags & kFeatureSession) {
             continue;
         }
-        text += feature.name + "\t" + feature.category + "\t" + std::to_string(feature.flags) + "\t" + feature.title + "\t" + feature.description;
+        // (the category, title, description and choices in the player's language; `name` stays as it is: it is
+        // the key settings.ini and --features use, and a launcher sets a feature by it)
+        text += feature.name + "\t" + i18n::tr(feature.category.c_str()) + "\t" + std::to_string(feature.flags) + "\t" +
+                i18n::tr(feature.title.c_str()) + "\t" + i18n::tr(feature.description.c_str());
         for (size_t i = 0; i < feature.choices.size(); i++) {
-            text += (i ? "|" : "\t") + feature.choices[i];
+            text += (i ? "|" : "\t") + std::string(i18n::tr(feature.choices[i].c_str()));
         }
         text += "\n";
     }

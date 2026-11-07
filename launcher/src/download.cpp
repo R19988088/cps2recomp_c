@@ -7,7 +7,10 @@
 #include "run_program.h"
 
 #include <cctype>
+#include <chrono>
 #include <system_error>
+#include <thread>
+#include <vector>
 
 namespace launcher {
 
@@ -21,19 +24,6 @@ bool url_allowed(const std::string& url) {
         return false;
     }
     return url.rfind("https://", 0) == 0 || url.rfind("http://", 0) == 0 || url.rfind("file://", 0) == 0;
-}
-
-// archive.org's URLs name the set by a path, and its server may answer with another host's (dn721900.ca....):
-// curl's own address of the file (its effective URL) is what is told it, so that the redirect's host is the one
-// written to. That keeps the URL as it was given the one the port vouched for (url_allowed above).
-std::string follow_redirects(const std::string& url) {
-    std::string output;
-    if (run_program(curl_program(), {"-fsSLI", "--connect-timeout", "20", "-o", "/dev/null", "-w", "%{url_effective}", "-A", "recomp-launcher", url},
-                    &output) == 0 &&
-        output.rfind("https://", 0) == 0) {
-        return output;
-    }
-    return url;
 }
 
 }  // namespace
@@ -52,28 +42,34 @@ int fetch_to_file(const std::string& url, const fs::path& to) {
     fs::create_directories(to.parent_path(), error);
     const fs::path part = part_of(to);
     fs::remove(part, error);
-    // (a transfer that is cut short — archive.org does that now and then — is a network error, which --retry alone
-    // does not retry: --retry-all-errors does, and resumes where the file got to, which --speed-limit/time guard
-    // against a server that has stalled. The whole download is tried a few times before the player is told.)
-    const std::vector<std::string> args = {"-fsSL",  "--connect-timeout", "20", "--speed-limit", "1024", "--speed-time", "60",
-                                           "--retry", "5", "--retry-delay", "2", "--retry-all-errors", "-C", "-", "-A", "recomp-launcher",
-                                           "-o",      part.u8string(),   url};
-    int code = run_program(curl_program(), args, nullptr);
-    if (code != 0) {
-        fs::remove(part, error);
-        // (a second whole try: `-C -` with nothing to resume starts the file again)
-        code = run_program(curl_program(), args, nullptr);
-        if (code != 0) {
-            fs::remove(part, error);
-            return code;
+    // (a transfer cut short — archive.org does that now and then — is a network error, which curl's own --retry does
+    // not retry on the versions Windows 10 ships. So the tries are here, and each takes the file on from where it
+    // got to: --speed-limit/time give up on a server that has stalled instead of waiting forever.)
+    int code = 0;
+    for (int attempt = 0; attempt < 4; attempt++) {
+        std::vector<std::string> args = {"-fsSL", "--connect-timeout", "20", "--speed-limit", "1024", "--speed-time", "60", "-A",
+                                         "recomp-launcher", "-o", part.u8string()};
+        if (attempt > 0 && fs::exists(part, error)) {
+            args.push_back("-C");
+            args.push_back("-");  // (on from where it got to)
         }
+        args.push_back(url);
+        code = run_program(curl_program(), args, nullptr);
+        if (code == 0) {
+            fs::rename(part, to, error);
+            if (error) {
+                fs::remove(part, error);
+                return 23;  // (curl's "write error": it could not be put where it belongs)
+            }
+            return 0;
+        }
+        if (code == 22 || code == 6) {
+            break;  // (not there, or no connection: trying again would only wait)
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(2 * (attempt + 1)));
     }
-    fs::rename(part, to, error);
-    if (error) {
-        fs::remove(part, error);
-        return 23;  // (curl's "write error": it could not be put where it belongs)
-    }
-    return 0;
+    fs::remove(part, error);
+    return code;
 }
 
 std::string fetch_problem(int code) {
