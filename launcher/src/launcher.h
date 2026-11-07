@@ -169,6 +169,20 @@ struct Description {
     const char *file_not_set_up = "";         // what --play says when none is chosen
     SDL_DialogFileFilter file_filter = {"Game file", "*"};
     const char *file_key = "file";            // its key in launcher.ini, under [game]
+    // Where the port can get the file for a player who has not chosen one: the game file's card then has Download,
+    // and Replace… once there is a file (the player's own: the way out of a download that is not the right one).
+    // The files are downloaded into <the player's folder>/roms/ (beside each other: a set that shares files with
+    // its parent's zip is found whole), and the first is the one taken. `detail` is what the card says before it
+    // is got. No files: Choose… alone, as before.
+    struct Download {
+        struct File {
+            std::string url;
+            std::string name;  // as it is written in the player's folder
+        };
+        std::vector<File> files;
+        std::string detail;
+    };
+    Download download;
     std::function<FileCheck(const std::string &path)> check;
     bool check_on_thread = false;             // for a check that reads a large file
     // Optional: a game file near the program (a build inside the source tree), or ""
