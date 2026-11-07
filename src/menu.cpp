@@ -3,6 +3,7 @@
 // The in-game menu (menu.h).
 #include "menu.h"
 
+#include "i18n.h"
 #include "text.h"
 
 #include <algorithm>
@@ -345,6 +346,9 @@ void Menu::Draw(uint32_t *pixels, int width, int height) const {
     if (m_rows.empty()) {
         return;
     }
+    // (the 5x7 font has the letters of English only: the menu stays in it, whatever the launcher's language,
+    // rather than drawing "?" for every other letter)
+    const i18n::Untranslated untranslated;
     const Canvas canvas{pixels, width, height};
     // Sizes in font dots: d for the small text, 2d for the rows
     const float d = static_cast<float>(std::max(height / 300, 1));

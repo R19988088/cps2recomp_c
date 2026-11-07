@@ -333,6 +333,8 @@ int main(int argc, char** argv) {
     ImGui::GetCurrentContext()->ConfigNavWindowingWithGamepad = false;  // (one window: no list of windows)
     ImGui::GetCurrentContext()->ConfigNavWindowingKeyNext = 0;
     ImGui::GetCurrentContext()->ConfigNavWindowingKeyPrev = 0;
+    // (the language, before the font: Chinese is drawn in a font of its own)
+    launcher::load_language();
     ui::load_fonts();
     ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer3_Init(renderer);

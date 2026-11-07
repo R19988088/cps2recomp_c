@@ -24,6 +24,7 @@
 #include "launcher.h"
 #include "online.h"
 #include "settings.h"
+#include "../src/i18n.h"
 #ifdef LAUNCHER_UPDATE_REPO
 #include "update.h"
 #endif
@@ -219,6 +220,9 @@ private:
                       bool whole = true);
     void file_card(size_t which, float width);
     void display_cards(size_t which, float width);
+    // The language the launcher and the games are drawn in (i18n.h), and choosing another
+    void language_card(float width);
+    void set_language(recomp::i18n::Language language);
     // Play, under the page's heading, and why the game didn't start; whether it can be played now (online_card's `ready`)
     bool play_button(size_t which, float width);
     void online_card(size_t which, float width, bool ready);

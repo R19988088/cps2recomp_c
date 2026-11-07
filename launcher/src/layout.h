@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "../src/i18n.h"
 #include "ui.h"
 
 namespace layout {
@@ -90,17 +91,17 @@ inline void inset_separator(float width) {
 // A page's title and the lines under it.
 inline void heading(const char* title, const char* intro, float width) {
     const ui::Palette& p = ui::palette();
-    ui::text(title, ui::Font::Semibold, ui::size::kHeading, p.text);
+    ui::text(recomp::i18n::tr(title), ui::Font::Semibold, ui::size::kHeading, p.text);
     if (intro) {
         ui::gap(8);
-        ui::text(intro, ui::Font::Regular, ui::size::kLead, p.secondary, std::min(width, ui::px(620)));
+        ui::text(recomp::i18n::tr(intro), ui::Font::Regular, ui::size::kLead, p.secondary, std::min(width, ui::px(620)));
     }
     ui::gap(26);
 }
 
 // The small capitals over a card.
 inline void label(const char* text) {
-    ui::text(text, ui::Font::Semibold, ui::size::kDetail, ui::palette().secondary);
+    ui::text(recomp::i18n::tr(text), ui::Font::Semibold, ui::size::kDetail, ui::palette().secondary);
     ui::gap(10);
 }
 
