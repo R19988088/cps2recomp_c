@@ -187,7 +187,8 @@ make collection             # every game whose ROM set is here, and the launcher
 ```
 
 [docs/BUILDING.md](docs/BUILDING.md) has every platform and the checks; [docs/TOOLKIT.md](docs/TOOLKIT.md) has how the
-toolkit works and how a game is added.
+toolkit works and how a game is added, and [docs/UPSTREAM.md](docs/UPSTREAM.md) (中文) how this fork keeps its own
+changes while following the project it comes from.
 
 ## Feedback and contributing
 

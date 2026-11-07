@@ -2,11 +2,19 @@
 
 ## Unreleased
 
+- **ROM 扫描**：启动器不再自动下载游戏文件（下载代码连同上游的 ROM 站点地址一并移除），改用两个按钮：
+  **选择 ROM 文件夹** 扫描整个文件夹，按各游戏自己的集合名找出能用的压缩包；旁边的**刷新**按钮重新扫描上次
+  选的文件夹，方便事后补放进来的集合。选好的集合名显示在该游戏一行的右上角，未选时不再显示提示文字。
 - **中文界面**：启动器可以显示中文，入口是「游戏」页底部的「语言」行（没有「游戏」页的启动器上，在「功能」页）。
-  选择保存在 `launcher.ini` 的 `[launcher] language`，英文与中文实时切换。文案表在 `port/i18n_table.cpp`：一行一个
-  英文原文和它的中文，查不到时显示英文，所以上游改了英文只会让那一行失效，不会导致构建失败。中文由运行时读取的
-  中文字体绘制（程序旁的 `fonts/cjk.ttf`，否则用系统自带的），不编进程序、不进仓库。游戏内菜单保持英文：它用的是
-  5x7 点阵字体，只有英文字母（见 [TOOLKIT.md](docs/TOOLKIT.md)）。
+  选择保存在 `launcher.ini` 的 `[launcher] language`，英文与中文实时切换。文案表在 `port/i18n_table.cpp`
+  （568 条）：一行一个英文原文和它的中文，查不到时显示英文，所以上游改了英文只会让那一行失效，不会导致构建
+  失败。覆盖启动器界面、各游戏注册的功能（秘籍、训练、场地查看器）、基板设置及其选项。翻译在启动器读取
+  `--list-features` 时进行，因此**旧版游戏程序无需重新编译**也能显示中文。中文由系统自带字体绘制（macOS 的
+  PingFang/黑体/宋体、Windows 的微软雅黑、Linux 的 Noto/WQY），不编进程序、不随包分发。
+  游戏内菜单保持英文：它用的是 5x7 点阵字体，只有英文字母（见 [TOOLKIT.md](docs/TOOLKIT.md)）。
+- **跟随上游**：新增 [docs/UPSTREAM.md](docs/UPSTREAM.md)，说明本 fork 如何在保留自身改动的前提下同步上游，
+  以及 `recomp-common/` 这份只读副本的正确修改方式。启动器的自动更新默认关闭（`LAUNCHER_UPDATE_REPO` 为空），
+  以免本地构建被上游发布版覆盖。
 - **Favourite stages**: in the in-game menu, Enter or A on a list of stages (training's, the stage viewer's, the endless
   and team battles') marks the stage shown a favourite (a `*` after it), and a **Favourites** row under the list goes
   through the favourites alone. The same favourites in every list, kept in settings.ini.
