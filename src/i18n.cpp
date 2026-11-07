@@ -18,22 +18,23 @@ int g_untranslated = 0;
 
 // English text to its translation, for the language shown. Empty in English: the text is the translation.
 std::unordered_map<std::string, std::string> g_shown;
-// The port's table, kept so that the language can change without a new table
-const std::vector<Translation> *g_table = nullptr;
+// The port's table, kept so that the language can change without a new one (a copy: the port may hand a
+// temporary)
+std::vector<Translation> g_table;
 std::vector<Language> g_languages{Language::English};
 
 void build() {
     g_shown.clear();
     g_languages.clear();
     g_languages.push_back(Language::English);
-    if (!g_table || g_table->empty()) {
+    if (g_table.empty()) {
         return;
     }
     g_languages.push_back(Language::Chinese);
     if (g_language == Language::English) {
         return;
     }
-    for (const Translation &row : *g_table) {
+    for (const Translation &row : g_table) {
         if (row.first && row.second && *row.second) {
             g_shown[row.first] = row.second;
         }
@@ -81,17 +82,18 @@ const std::vector<Language> &languages() {
 }
 
 void set_translations(const std::vector<Translation> &table) {
-    g_table = &table;
+    // (copied: the port may hand a temporary, and the table outlives the call)
+    g_table = table;
     build();
 }
 
 std::string translation_text() {
     std::string text;
-    if (!g_table) {
+    if (g_table.empty()) {
         return text;
     }
     // (each text once: the font atlas is asked for the letters, not for the lines)
-    for (const Translation &row : *g_table) {
+    for (const Translation &row : g_table) {
         if (row.second && *row.second) {
             text += row.second;
             text += '\n';
@@ -102,11 +104,11 @@ std::string translation_text() {
 
 std::vector<unsigned> translation_codepoints() {
     std::vector<unsigned> points;
-    if (!g_table) {
+    if (g_table.empty()) {
         return points;
     }
     // (UTF-8 by hand: recomp-common has no dependency for it, and the table is the port's own)
-    for (const Translation &row : *g_table) {
+    for (const Translation &row : g_table) {
         for (const char *at = row.second; at && *at;) {
             const unsigned char lead = static_cast<unsigned char>(*at);
             unsigned point = 0;
