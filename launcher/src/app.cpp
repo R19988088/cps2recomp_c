@@ -1911,7 +1911,6 @@ void App::file_card(size_t which, float width) {
     ui::gap(10);
     Card card(width);
     const bool download = !one.about->download.files.empty();
-    const bool usable = !one.file_path.empty() && !one.checking && file.usable();
     const bool failed = !one.file_path.empty() && !one.checking && !file.usable();
     std::string shown;
     if (!one.file_path.empty()) {
@@ -1954,8 +1953,8 @@ void App::file_card(size_t which, float width) {
 }
 
 // A game file's buttons, in the row that has it: Download while it is not usable (the port knows where it is), and
-// Replace… beside it once a download was not the right one (the player's own copy, the way out of it). A port with
-// no download has Choose…, as before; so has a file that is usable, to change it.
+// Replace… beside it once a downloaded file is not the right one (the player's own copy, the way out of it). A port
+// with no download has Choose…, as before.
 void App::file_buttons(size_t which, bool compact) {
     Slot& one = *slots_[which];
     const bool download = !one.about->download.files.empty();
@@ -1968,25 +1967,23 @@ void App::file_buttons(size_t which, bool compact) {
     const bool usable = !one.file_path.empty() && !one.checking && file.usable();
     const bool failed = !one.file_path.empty() && !one.checking && !file.usable();
     const float button = compact ? 110.0f : 130.0f;
-    const bool manual = !download || usable || failed;
     if (download && !usable) {
         std::string label = one.downloading ? "Downloading…" : "Download";
         if (ui::button(label.c_str(), Kind::Primary, button, !busy)) {
             download_game_file(which);
         }
-        if (manual) {
-            ImGui::SameLine(0.0f, px(10));
+        if (!failed) {
+            return;  // (nothing chosen yet: Download alone; Replace… comes with a file that was not the right one)
         }
+        ImGui::SameLine(0.0f, px(10));
     }
-    if (manual) {
-        std::string label = download ? "Replace…" : "Choose…";
-        if (ui::button(label.c_str(), Kind::Secondary, button, !busy)) {
-            // (the system's file dialog wants a mouse or a keyboard)
-            if (ui::gamepad_in_use()) {
-                open_browser(which, false);
-            } else {
-                choose_game_file(which);
-            }
+    std::string label = download ? "Replace…" : "Choose…";
+    if (ui::button(label.c_str(), Kind::Secondary, button, !busy)) {
+        // (the system's file dialog wants a mouse or a keyboard)
+        if (ui::gamepad_in_use()) {
+            open_browser(which, false);
+        } else {
+            choose_game_file(which);
         }
     }
 }
