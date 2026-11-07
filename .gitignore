@@ -9,3 +9,6 @@ rom/
 *.state
 state*.bin
 frame_data.csv
+/example/work/
+# a local macOS app (tools/make_local_app.sh): built here, not a release
+/dist/
