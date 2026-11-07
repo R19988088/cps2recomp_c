@@ -39,6 +39,10 @@ const std::vector<Language> &languages();
 // The port's table, installed once at the start: it must outlive the program (a static array).
 void set_translations(const std::vector<Translation> &table);
 
+// Every text of the table's translations, joined: the letters a font must have to draw them (a launcher
+// asks for their glyphs before it draws, so that a text drawn straight to the draw list has them).
+std::string translation_text();
+
 // The translation of `text`, or `text` itself when there is none (and for nullptr). The pointer is kept
 // until the table is replaced: safe to hand to a drawing call.
 const char *tr(const char *text);

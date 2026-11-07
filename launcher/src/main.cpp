@@ -336,6 +336,7 @@ int main(int argc, char** argv) {
     // (the language, before the font: Chinese is drawn in a font of its own)
     launcher::load_language();
     ui::load_fonts();
+    ui::preload_translation_glyphs();
     ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer3_Init(renderer);
     ImGui_ImplSDL3_SetGamepadMode(ImGui_ImplSDL3_GamepadMode_AutoAll);

@@ -233,6 +233,22 @@ void load_fonts() {
     }
 }
 
+// The letters of every translation, asked of each font now: a text that is drawn straight to a draw list
+// (a page's heading, a row's words) is measured rather than laid out, and measuring is what adds a glyph to
+// the atlas. Without this, the first frame of a Chinese launcher draws "?" for the letters it has not baked
+// yet. Called after the fonts are loaded and before the first frame.
+void preload_translation_glyphs() {
+    if (recomp::i18n::language() != recomp::i18n::Language::Chinese) {
+        return;
+    }
+    const std::string letters = recomp::i18n::translation_text();
+    for (int index = 0; index < 2; index++) {
+        if (g_fonts[index]) {
+            g_fonts[index]->CalcTextSizeA(size::kBody, FLT_MAX, 0.0f, letters.c_str());
+        }
+    }
+}
+
 void begin_frame(float delta) {
     g_delta = std::min(delta, 0.1f);
     g_focus_next = false;

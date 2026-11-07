@@ -85,6 +85,21 @@ void set_translations(const std::vector<Translation> &table) {
     build();
 }
 
+std::string translation_text() {
+    std::string text;
+    if (!g_table) {
+        return text;
+    }
+    // (each text once: the font atlas is asked for the letters, not for the lines)
+    for (const Translation &row : *g_table) {
+        if (row.second && *row.second) {
+            text += row.second;
+            text += '\n';
+        }
+    }
+    return text;
+}
+
 const char *tr(const char *text) {
     if (!text || g_untranslated > 0 || g_shown.empty()) {
         return text;

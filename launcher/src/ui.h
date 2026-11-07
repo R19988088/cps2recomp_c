@@ -51,6 +51,8 @@ bool dark();
 const Palette& palette();
 void apply_style(float scale);
 void load_fonts();
+// The letters of the port's translations, asked of the fonts before the first frame (see ui.cpp)
+void preload_translation_glyphs();
 float scale();
 float px(float value);
 
