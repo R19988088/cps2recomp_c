@@ -150,7 +150,11 @@ std::filesystem::path player_folder(const char* name, const char* home_env) {
 // (launcher.h: the language, before anything is drawn: it decides the font and the words)
 void launcher::load_language() {
     // (the port's table first: the language is chosen from it)
-    recomp::i18n::set_translations(the_description().translations);
+#ifdef LAUNCHER_COLLECTION
+    recomp::i18n::set_translations(launcher::describe_collection().games.front().description.translations);
+#else
+    recomp::i18n::set_translations(launcher::describe().translations);
+#endif
     recomp::Ini prefs(player_folder(LAUNCHER_GAME_NAME, LAUNCHER_HOME_ENV) / "launcher.ini");
     prefs.load();
     recomp::i18n::set_language(prefs.get("launcher", "language"));
