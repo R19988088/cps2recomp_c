@@ -9,6 +9,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <string>
 #include <unordered_map>
@@ -64,23 +66,34 @@ void add_font(int index, const char* name) {
     g_fonts[index] = ImGui::GetIO().Fonts->AddFontFromMemoryTTF(const_cast<char*>(data.data()), static_cast<int>(data.size()), size::kBody, &config);
 }
 
+// (the glyph ranges: the letters of every translation, in the form ImGui wants, kept as long as the fonts are)
+std::vector<ImWchar> g_ranges;
+
 // A font with Chinese glyphs merged into the launcher's own: Inter has none, so without it Chinese text is
 // boxes. The font is not compiled in (a full CJK font is several megabytes): it is read from beside the
 // program, or from the system's own. Merged into both faces, and only when the language is Chinese, so that
 // the other languages do not pay for its glyphs.
 //
-// (no glyph ranges: Dear ImGui 1.92 adds the glyphs a text asks for to the atlas as it draws, so every
-// character the table has shows without listing its range here)
+// The glyph ranges are the table's own letters, given up front: every one of them is in the atlas from the
+// first frame, which is what a text drawn straight to a draw list (a heading, a row's words) needs.
 void add_cjk() {
     if (g_cjk_font.empty()) {
         return;
     }
+    g_ranges.clear();
+    const std::vector<unsigned> points = recomp::i18n::translation_codepoints();
+    // (a range a letter, as the atlas takes them: two values each, ending in 0)
+    for (unsigned point : points) {
+        g_ranges.push_back(static_cast<ImWchar>(point));
+        g_ranges.push_back(static_cast<ImWchar>(point));
+    }
+    g_ranges.push_back(0);
     for (int index = 0; index < 2; index++) {
         ImFontConfig config;
         config.MergeMode = true;
         config.OversampleH = 2;
         config.OversampleV = 2;
-        ImGui::GetIO().Fonts->AddFontFromFileTTF(g_cjk_font.c_str(), size::kBody, &config);
+        ImGui::GetIO().Fonts->AddFontFromFileTTF(g_cjk_font.c_str(), size::kBody, &config, g_ranges.data());
     }
 }
 
@@ -233,18 +246,54 @@ void load_fonts() {
     }
 }
 
-// The letters of every translation, asked of each font now: a text that is drawn straight to a draw list
-// (a page's heading, a row's words) is measured rather than laid out, and measuring is what adds a glyph to
-// the atlas. Without this, the first frame of a Chinese launcher draws "?" for the letters it has not baked
-// yet. Called after the fonts are loaded and before the first frame.
+// The letters of every translation, laid out once (which is what adds a glyph to the atlas): a text drawn
+// straight to a draw list (a page's heading, a row's words, a button's label) does not add its glyphs, and
+// without them it draws "?" until something else has. Called in a frame, after NewFrame.
+namespace {
+bool g_glyphs_asked = false;
+}
+
 void preload_translation_glyphs() {
-    if (recomp::i18n::language() != recomp::i18n::Language::Chinese) {
+    if (g_glyphs_asked || recomp::i18n::language() != recomp::i18n::Language::Chinese) {
         return;
     }
+    g_glyphs_asked = true;
     const std::string letters = recomp::i18n::translation_text();
     for (int index = 0; index < 2; index++) {
         if (g_fonts[index]) {
-            g_fonts[index]->CalcTextSizeA(size::kBody, FLT_MAX, 0.0f, letters.c_str());
+            push_font(index == 1 ? Font::Semibold : Font::Regular, size::kBody);
+            ImGui::CalcTextSize(letters.c_str());  // (the layout is what bakes the glyphs, not this size)
+            pop_font();
+        }
+    }
+    if (const char* debug = std::getenv("RECOMP_LAUNCHER_I18N_DEBUG")) {
+        (void)debug;
+        std::fprintf(stderr, "[i18n] letters=%zu font=%s\n", letters.size(), g_cjk_font.c_str());
+        for (int index = 0; index < 2; index++) {
+            if (!g_fonts[index]) {
+                continue;
+            }
+            push_font(index == 1 ? Font::Semibold : Font::Regular, size::kBody);
+            ImFontBaked* baked = ImGui::GetFontBaked();
+            int have = 0, missing = 0;
+            for (const char* at = letters.c_str(); *at;) {
+                unsigned int cp = 0;
+                const int bytes = ImTextCharFromUtf8(&cp, at, nullptr);
+                if (bytes <= 0) {
+                    break;
+                }
+                at += bytes;
+                if (cp < 0x80) {
+                    continue;
+                }
+                if (baked->FindGlyphNoFallback(static_cast<ImWchar>(cp))) {
+                    have++;
+                } else {
+                    missing++;
+                }
+            }
+            std::fprintf(stderr, "[i18n] font %d: have=%d missing=%d\n", index, have, missing);
+            pop_font();
         }
     }
 }

@@ -43,6 +43,10 @@ void set_translations(const std::vector<Translation> &table);
 // asks for their glyphs before it draws, so that a text drawn straight to the draw list has them).
 std::string translation_text();
 
+// The code points of every translation, sorted and without repeats: the glyph ranges a font is given, so
+// that all of them are in the atlas from the first frame.
+std::vector<unsigned> translation_codepoints();
+
 // The translation of `text`, or `text` itself when there is none (and for nullptr). The pointer is kept
 // until the table is replaced: safe to hand to a drawing call.
 const char *tr(const char *text);

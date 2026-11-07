@@ -100,6 +100,52 @@ std::string translation_text() {
     return text;
 }
 
+std::vector<unsigned> translation_codepoints() {
+    std::vector<unsigned> points;
+    if (!g_table) {
+        return points;
+    }
+    // (UTF-8 by hand: recomp-common has no dependency for it, and the table is the port's own)
+    for (const Translation &row : *g_table) {
+        for (const char *at = row.second; at && *at;) {
+            const unsigned char lead = static_cast<unsigned char>(*at);
+            unsigned point = 0;
+            int bytes = 1;
+            if (lead < 0x80) {
+                point = lead;
+            } else if ((lead & 0xE0) == 0xC0) {
+                point = lead & 0x1Fu;
+                bytes = 2;
+            } else if ((lead & 0xF0) == 0xE0) {
+                point = lead & 0x0Fu;
+                bytes = 3;
+            } else if ((lead & 0xF8) == 0xF0) {
+                point = lead & 0x07u;
+                bytes = 4;
+            } else {
+                at++;
+                continue;  // (not a UTF-8 lead byte)
+            }
+            bool whole = true;
+            for (int i = 1; i < bytes; i++) {
+                const unsigned char next = static_cast<unsigned char>(at[i]);
+                if ((next & 0xC0) != 0x80) {
+                    whole = false;
+                    break;
+                }
+                point = (point << 6) | (next & 0x3Fu);
+            }
+            at += whole ? bytes : 1;
+            if (whole && point >= 0x20 && point != 0x7F) {
+                points.push_back(point);
+            }
+        }
+    }
+    std::sort(points.begin(), points.end());
+    points.erase(std::unique(points.begin(), points.end()), points.end());
+    return points;
+}
+
 const char *tr(const char *text) {
     if (!text || g_untranslated > 0 || g_shown.empty()) {
         return text;
