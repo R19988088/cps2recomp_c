@@ -196,6 +196,7 @@ include(../recomp-common/launcher/launcher.cmake)     # makes the target `launch
 | `file_heading`, `file_intro`, `file_empty`, `file_not_set_up`, `file_filter`, `file_key` | The words for the player's game file, the file dialog's filter, and its key in `launcher.ini`. |
 | `check` | Looks at the player's file and says `Good` (the file the port was made from), `Usable` (it may run) or `NotUsable`, with a line for the player. It must only read the file. |
 | `check_on_thread` | For a check that reads a large file: the page says "Checking..." meanwhile. |
+| `download` | Optional: where the launcher can get the player's game file (`files`: a URL and the name it is written under, into the player's folder's `roms/`), and the card's `detail` while there is none. The Game page then has **Download** instead of Choose…, and **Replace…** beside it once a file that came that way is not the right one (the player's own copy, the way out of it). A set split between its own and its parent's zip is downloaded as both, written beside each other, and the first is taken. |
 | `find_nearby` | Optional: a game file near the program, for a build inside the source tree. |
 | `arguments` | What the game is started with, from the file, the player's folder and the Display switches. |
 | `mute_argument` | What the game is started with when the Game page's "Muted" switch is on (`launcher.ini`, `[audio]`); `"--mute"` unless the port says otherwise, `nullptr` for no switch. The game's menu should have a row that switches the sound off and on. |
