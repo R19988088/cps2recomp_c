@@ -426,6 +426,36 @@ bool button(const char* label, Kind kind, float width, bool enabled, float heigh
     return pressed;
 }
 
+// A round button with a circular arrow in it, to look again: the same fill and ring as a Secondary button, a
+// circle round the arrow, and a gap at the top right where the arrow's head is
+bool refresh_button(const char* id_text, float value, bool enabled) {
+    ImGuiWindow* window = ImGui::GetCurrentWindow();
+    ImGuiID id = window->GetID(id_text);
+    ImVec2 box(px(value), px(value));
+    ImRect rect(window->DC.CursorPos, window->DC.CursorPos + box);
+    bool hovered = false;
+    bool held = false;
+    bool pressed = behavior(rect, id, enabled, hovered, held, enabled);
+    const Palette& p = palette();
+    float hover = animate(id + 1, hovered ? 1.0f : 0.0f, 22.0f);
+    float press = animate(id + 2, held ? 1.0f : 0.0f, 30.0f);
+    float alpha = enabled ? 1.0f : 0.4f;
+    ImRect shown = pressed_rect(rect, press);
+    window->DrawList->AddRectFilled(shown.Min, shown.Max, fade(mix(p.control, p.control_hover, hover), alpha), box.x * 0.5f);
+    // (the arrow: a 300-degree arc, and a two-line head at its open end, turned as the arc's end points)
+    const ImVec2 center((shown.Min.x + shown.Max.x) * 0.5f, (shown.Min.y + shown.Max.y) * 0.5f);
+    const float radius = px(7.0f);
+    const ImU32 ink = fade(p.secondary, alpha);
+    const float start = -IM_PI * 0.35f;
+    window->DrawList->PathArcTo(center, radius, start, start + IM_PI * 1.65f, 28);
+    window->DrawList->PathStroke(ink, px(1.8f));
+    const ImVec2 tip(center.x + std::cos(start + IM_PI * 1.65f) * radius, center.y + std::sin(start + IM_PI * 1.65f) * radius);
+    window->DrawList->AddLine(tip, tip + ImVec2(px(3.4f), -px(3.8f)), ink, px(1.8f));
+    window->DrawList->AddLine(tip, tip + ImVec2(px(-1.6f), -px(4.8f)), ink, px(1.8f));
+    focus_ring(rect, id, box.x * 0.5f);
+    return pressed;
+}
+
 bool toggle(const char* id_text, bool value) {
     ImGuiWindow* window = ImGui::GetCurrentWindow();
     ImGuiID id = window->GetID(id_text);

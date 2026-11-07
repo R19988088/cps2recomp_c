@@ -89,13 +89,6 @@ private:
         launcher::FileCheck file;        // (under mutex_ when checked on a thread)
         std::atomic<bool> checking{false};
         std::thread checker;
-        // A download of its file (Description::download): its thread, the file it is writing (a ".part" beside the
-        // one it is for), and what it got or why it did not (all but the flag under mutex_)
-        std::atomic<bool> downloading{false};
-        std::thread downloader;
-        std::filesystem::path download_part;
-        std::string download_took;
-        std::string download_error;
         std::vector<int> values_before;  // its features' values when it was started (a collection's: what its menu changed)
         GameProcess game;                // its program, while it runs (a collection's games can run at once)
         bool was_running = false;
@@ -165,11 +158,6 @@ private:
     // Game file.
     void choose_game_file(size_t which);
     void use_game_file(size_t which, const std::string& path);
-    // A download of its file (Description::download): started, and what it says for the player meanwhile
-    void download_game_file(size_t which);
-    std::string download_status(size_t which, double* fraction = nullptr) const;
-    // A download that has finished, taken: the game's file is that one, and it is checked as a chosen one is
-    void take_downloads();
     void play(size_t which, const std::vector<std::string>& extra = {});
     // A collection's: every game's file looked for in a folder (on a thread), or a file or folder given to
     // whichever game takes it
@@ -231,7 +219,7 @@ private:
     void feature_list(float width, const std::vector<FeatureRow>& rows, const char* none, Set set, Offered offered, SetOffered set_offered,
                       bool whole = true);
     void file_card(size_t which, float width);
-    // The game file's buttons in its row (Download, and Replace… or Choose…), `compact` in a list's row
+    // The game file's button in its row (Choose…), `compact` in a list's row
     void file_buttons(size_t which, bool compact = false);
     void display_cards(size_t which, float width);
     // The language the launcher and the games are drawn in (i18n.h), and choosing another

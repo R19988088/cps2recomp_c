@@ -192,15 +192,17 @@ std::vector<FeatureInfo> ParseFeatureList(const std::string &text) {
             continue;
         }
         FeatureInfo feature;
+        // (`name` is the key; the rest is what the player reads, and is translated here: a game program that is
+        // older than the launcher's table still gets its words in the player's language)
         feature.name = parts[0];
-        feature.category = parts[1];
+        feature.category = i18n::tr(parts[1].c_str());
         feature.flags = static_cast<unsigned>(std::strtoul(parts[2].c_str(), nullptr, 10));
-        feature.title = parts[3];
-        feature.description = parts[4];
+        feature.title = i18n::tr(parts[3].c_str());
+        feature.description = i18n::tr(parts[4].c_str());
         if (parts.size() > 5 && !parts[5].empty()) {
             std::stringstream choices(parts[5]);
             while (std::getline(choices, part, '|')) {
-                feature.choices.push_back(part);
+                feature.choices.push_back(i18n::tr(part.c_str()));
             }
         }
         features.push_back(feature);

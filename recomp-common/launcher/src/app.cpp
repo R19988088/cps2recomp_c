@@ -23,7 +23,6 @@
 #include <jni.h>
 #endif
 
-#include "download.h"
 #include "folders.h"
 #include "gamepads.h"
 #include "layout.h"
@@ -524,9 +523,6 @@ App::~App() {
         if (one->checker.joinable()) {
             one->checker.join();
         }
-        if (one->downloader.joinable()) {
-            one->downloader.join();
-        }
     }
     if (finder_.joinable()) {
         finder_.join();
@@ -540,7 +536,7 @@ bool App::busy() const {
         }
     }
     for (const auto& one : slots_) {
-        if (one->checking || one->downloading) {
+        if (one->checking) {
             return true;
         }
     }
@@ -556,7 +552,7 @@ bool App::ready_for_keys() const {
     if (!collection_) {
         return !busy();
     }
-    return !finding_ && std::none_of(slots_.begin(), slots_.end(), [](const auto& one) { return one->checking.load() || one->downloading.load(); });
+    return !finding_ && std::none_of(slots_.begin(), slots_.end(), [](const auto& one) { return one->checking.load(); });
 }
 
 bool App::any_running() const {
@@ -1078,98 +1074,6 @@ void App::use_game_file(size_t which, const std::string& path) {
     });
 }
 
-// The port's files downloaded into the player's own folder, where a set and its parent's zip sit beside each other.
-// The player chose none, so they are taken as they come: they were asked for by name, and `check` has the last word.
-void App::download_game_file(size_t which) {
-    Slot& one = *slots_[which];
-    const launcher::Description::Download& download = one.about->download;
-    if (download.files.empty() || one.downloading) {
-        return;
-    }
-    if (one.downloader.joinable()) {
-        one.downloader.join();
-    }
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        one.download_took.clear();
-        one.download_error.clear();
-    }
-    one.downloading = true;
-    one.downloader = std::thread([this, &one, download] {
-        const std::filesystem::path folder = one.folder / "roms";
-        std::vector<std::filesystem::path> got;
-        std::string failure;
-        for (const launcher::Description::Download::File& file : download.files) {
-            const std::filesystem::path to = folder / std::filesystem::u8path(file.name);
-            {
-                std::lock_guard<std::mutex> lock(mutex_);
-                one.download_part = launcher::part_of(to);
-            }
-            const int code = launcher::fetch_to_file(file.url, to);
-            if (code != 0) {
-                failure = std::string(recomp::i18n::tr("Couldn't download ")) + file.name + ": " +
-                          recomp::i18n::tr(launcher::fetch_problem(code).c_str()) + ".";
-                break;
-            }
-            got.push_back(to);
-        }
-        std::string took;
-        if (failure.empty() && !got.empty()) {
-            took = got.front().u8string();
-        }
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            one.download_part.clear();
-            one.download_took = took;
-            one.download_error = failure;
-        }
-        one.downloading = false;
-        wake();
-    });
-}
-
-// What the card says of a download: how far it has got (a fraction of the file it is writing, or -1 while there is
-// nothing to tell), and what it got or why it did not
-std::string App::download_status(size_t which, double* fraction) const {
-    const Slot& one = *slots_[which];
-    std::string error;
-    std::filesystem::path part;
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        error = one.download_error;
-        part = one.download_part;
-    }
-    if (fraction) {
-        *fraction = -1.0;
-        if (one.downloading && !part.empty()) {
-            std::error_code ignored;
-            const uint64_t got = std::filesystem::exists(part, ignored) ? std::filesystem::file_size(part, ignored) : 0;
-            // (a set's zip is a few megabytes: a nearly full bar at 40 MB, which no set is)
-            *fraction = std::min(0.98, static_cast<double>(got) / (40.0 * 1000.0 * 1000.0));
-        }
-    }
-    return error;
-}
-
-// A download that has finished is the player's file: taken, and checked as one they chose is. (A failed one is
-// said in the card, and Replace… is there for the player to pick their own.)
-void App::take_downloads() {
-    for (size_t which = 0; which < slots_.size(); which++) {
-        Slot& one = *slots_[which];
-        if (one.downloading) {
-            continue;
-        }
-        std::string took;
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            took.swap(one.download_took);
-        }
-        if (!took.empty()) {
-            use_game_file(which, took);
-        }
-    }
-}
-
 // A collection's: the file or folder dropped or chosen, for whichever of the games it is. A folder is looked in
 // for each game's file (its description's candidates); the folder itself may be one game's. On a thread (a
 // check may read a large file); frame() takes what was found.
@@ -1182,6 +1086,15 @@ void App::find_in(const std::string& path) {
     }
     finding_ = true;
     find_message_.clear();
+    // (the folder kept, for the row to show and the refresh button to look in again; a file dropped on the window
+    // is another way in, not a folder of games)
+    {
+        std::error_code error;
+        if (std::filesystem::is_directory(std::filesystem::u8path(path), error)) {
+            prefs_.set("games", "folder", path);
+            prefs_.save();
+        }
+    }
     std::vector<std::pair<size_t, const launcher::Description*>> games;
     for (size_t which = 0; which < slots_.size(); which++) {
         if (slots_[which]->has_program()) {
@@ -1461,7 +1374,6 @@ void App::frame() {
             find_message_ = "Found " + names + " (" + std::to_string(found.size()) + " of " + std::to_string(here) + ").";
         }
     }
-    take_downloads();
     // A game that ended may have changed its settings.ini (its menu's features): what it left is what is shown
     // and kept
     for (size_t which = 0; which < slots_.size(); which++) {
@@ -1898,8 +1810,7 @@ void App::page(float width, float height) {
 
 // ---- Game --------------------------------------------------------------------------------
 
-// The card with the game's file in it, and the button that gets it: Download where the port says where it is
-// (Description::download), and Choose… for a port that leaves it to the player
+// The card with the game's file in it, and the button that chooses it
 void App::file_card(size_t which, float width) {
     const ui::Palette& p = ui::palette();
     Slot& one = *slots_[which];
@@ -1911,36 +1822,16 @@ void App::file_card(size_t which, float width) {
     ui::text(one.about->file_heading, Font::Semibold, ui::size::kDetail, p.secondary);
     ui::gap(10);
     Card card(width);
-    const bool download = !one.about->download.files.empty();
-    double fraction = -1.0;
-    const std::string said = download_status(which, &fraction);
-    const bool failed = !one.file_path.empty() && !one.checking && !file.usable();
-    std::string shown;
-    if (!one.file_path.empty()) {
-        shown = one.file_path;
-    } else {
-        shown = download && !one.about->download.detail.empty() ? one.about->download.detail : std::string(one.about->file_empty);
-    }
-    // (two buttons, Download and Replace…, once there is something to replace: a file that is not the right one,
-    // or a download that did not work)
-    const bool two = download && (failed || !said.empty());
-    float controls = two ? 270.0f : 130.0f;
-    shown = ui::fit_start(shown, Font::Regular, ui::size::kBody, width - px(controls) - px(70));
+    std::string shown = one.file_path.empty() ? std::string(one.about->file_empty) : one.file_path;
+    shown = ui::fit_start(shown, Font::Regular, ui::size::kBody, width - px(200));
     std::string status;
     if (one.checking) {
         status = "Checking…";
-    } else if (one.downloading) {
-        status = recomp::i18n::tr("Downloading…");
-        if (fraction >= 0.0) {
-            status += " " + std::to_string(static_cast<int>(fraction * 100.0f)) + "%";
-        }
-    } else if (!said.empty()) {
-        status = said;  // (why the download did not work)
     } else if (!one.file_path.empty()) {
         status = file.message;
     }
     ImVec2 row_top = ImGui::GetCursorScreenPos();
-    row(width, shown.c_str(), status.c_str(), controls, 36.0f, [&] { file_buttons(which); });
+    row(width, shown.c_str(), status.c_str(), 130.0f, 36.0f, [&] { file_buttons(which); });
     if (!one.file_path.empty() && !one.checking) {
         // A mark at the card's left edge: good file, usable file, or not usable.
         ImVec2 center(row_top.x - px(14), row_top.y + px(24));
@@ -1955,34 +1846,18 @@ void App::file_card(size_t which, float width) {
     card.end();
 }
 
-// A game file's buttons, in the row that has it: Download while it is not usable (the port knows where it is), and
-// Replace… beside it once a file is there and is not the right one — a download that went wrong, or another release
-// — the player's own copy, the way out of both. A port with no download has Choose…, as before.
+// The game file's button in its row, to choose another (a gamepad gets the launcher's own browser)
 void App::file_buttons(size_t which, bool compact) {
     Slot& one = *slots_[which];
-    const bool download = !one.about->download.files.empty();
     FileCheck file;
-    std::string download_error;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         file = one.file;
-        download_error = one.download_error;
     }
-    const bool busy = one.checking || one.downloading;
+    const bool busy = one.checking;
     const bool usable = !one.file_path.empty() && !one.checking && file.usable();
-    const bool failed = (!one.file_path.empty() && !one.checking && !file.usable()) || !download_error.empty();
     const float button = compact ? 110.0f : 130.0f;
-    if (download && !usable) {
-        std::string label = one.downloading ? "Downloading…" : "Download";
-        if (ui::button(label.c_str(), Kind::Primary, button, !busy)) {
-            download_game_file(which);
-        }
-        if (!failed) {
-            return;  // (nothing chosen yet and nothing wrong: Download alone)
-        }
-        ImGui::SameLine(0.0f, px(10));
-    }
-    std::string label = download ? "Replace…" : "Choose…";
+    std::string label = one.file_path.empty() || !usable ? "Choose…" : "Replace…";
     if (ui::button(label.c_str(), Kind::Secondary, button, !busy)) {
         // (the system's file dialog wants a mouse or a keyboard)
         if (ui::gamepad_in_use()) {
@@ -2506,13 +2381,9 @@ void App::online_page(float width) {
                     if (other) {
                         ui::button("Join", Kind::Secondary, 130.0f, false);
                     } else if (!file) {
-                        const bool can_download = !one.about->download.files.empty();
-                        std::string label = !can_download ? std::string("Add…") : one.downloading ? std::string("Downloading…") : std::string("Download");
-                        if (ui::button(label.c_str(), can_download ? Kind::Primary : Kind::Secondary, 130.0f,
-                                       !(one.checking || one.downloading))) {
-                            if (can_download) {
-                                download_game_file(which);
-                            } else if (ui::gamepad_in_use()) {  // (the system's file dialog wants a mouse or a keyboard)
+                        if (ui::button("Add…", Kind::Secondary, 130.0f, !one.checking)) {
+                            // (the system's file dialog wants a mouse or a keyboard)
+                            if (ui::gamepad_in_use()) {
                                 open_browser(which, false);
                             } else {
                                 choose_game_file(which);
@@ -2603,14 +2474,8 @@ void App::online_page(float width) {
                 }
                 ImGui::SameLine(0.0f, px(10));
                 if (join_needs_ >= 0) {
-                    const Slot& needed = *slots_[static_cast<size_t>(join_needs_)];
-                    const bool can_download = !needed.about->download.files.empty();
-                    std::string label = !can_download ? std::string("Add…") : needed.downloading ? std::string("Downloading…") : std::string("Download");
-                    if (ui::button(label.c_str(), can_download ? Kind::Primary : Kind::Secondary, 130.0f,
-                                   !(needed.checking || needed.downloading))) {
-                        if (can_download) {
-                            download_game_file(static_cast<size_t>(join_needs_));
-                        } else if (ui::gamepad_in_use()) {
+                    if (ui::button("Add…", Kind::Secondary, 130.0f, !slots_[static_cast<size_t>(join_needs_)]->checking)) {
+                        if (ui::gamepad_in_use()) {
                             open_browser(static_cast<size_t>(join_needs_), false);
                         } else {
                             choose_game_file(static_cast<size_t>(join_needs_));
@@ -2850,14 +2715,8 @@ void App::invitations_card(float width) {
                     play(which, join_arguments(slots_[which]->about->online, invitation->code));
                 }
             } else if (known) {
-                const Slot& needed = *slots_[which];
-                const bool can_download = !needed.about->download.files.empty();
-                std::string label = !can_download ? std::string("Add…") : needed.downloading ? std::string("Downloading…") : std::string("Download");
-                if (ui::button(label.c_str(), can_download ? Kind::Primary : Kind::Secondary, 130.0f,
-                               !(needed.checking || needed.downloading))) {
-                    if (can_download) {
-                        download_game_file(which);
-                    } else if (ui::gamepad_in_use()) {
+                if (ui::button("Add…", Kind::Secondary, 130.0f, !slots_[which]->checking)) {
+                    if (ui::gamepad_in_use()) {
                         open_browser(which, false);
                     } else {
                         choose_game_file(which);
@@ -3053,11 +2912,17 @@ void App::library_page(float width) {
 #ifdef LAUNCHER_UPDATE_REPO
     update_card(width, true, true);  // (above the games, new version or not)
 #endif
-    ui::text("FIND YOUR GAMES", Font::Semibold, ui::size::kDetail, p.secondary);
-    ui::gap(10);
+    // (one row: the folder the games are in, and looking in it again. Its games are shown under it, each as it is
+    // found, so the row says nothing but the folder when one is chosen)
     Card find(width);
-    std::string detail = finding_ ? std::string("Looking…") : find_message_.empty() ? std::string(collection_->find_detail) : find_message_;
-    row(width, collection_->find_title, detail.c_str(), 150.0f, 36.0f, [&] {
+    std::string detail = finding_ ? std::string("Looking…")
+                        : find_message_.empty() ? std::string(collection_->find_detail)
+                                                : find_message_;
+    const std::string folder = prefs_.get("games", "folder");
+    if (!folder.empty() && !finding_ && find_message_.empty()) {
+        detail = ui::fit_start(folder, Font::Regular, ui::size::kDetail, width - px(300));
+    }
+    row(width, collection_->find_title, detail.c_str(), 220.0f, 36.0f, [&] {
 #ifdef __ANDROID__
         // (Android: the sets themselves are chosen, and copied into the launcher's folder: choose_folder)
         const char* label = "Add ROM sets…";
@@ -3071,6 +2936,13 @@ void App::library_page(float width) {
                 open_browser(kAnyGame, true);
             } else {
                 choose_folder();
+            }
+        }
+        // (looking in the folder chosen last again, for a set dropped in beside the others since)
+        if (!folder.empty()) {
+            ImGui::SameLine(0.0f, px(14));
+            if (ui::refresh_button("##find-again", 36.0f, !finding_)) {
+                find_in(folder);
             }
         }
     });
@@ -3129,19 +3001,13 @@ void App::library_page(float width) {
             file = one.file;
         }
         bool usable = !one.checking && !one.file_path.empty() && file.usable();
-        const bool download = !one.about->download.files.empty();
-        const std::string said = download_status(which);
-        // (a download that did not work keeps its own line under the row. A row with no set chosen says nothing:
-        // the row's name is the game's, and the set's own file name goes at the row's end once there is one)
-        const bool wrong = (!one.file_path.empty() && !one.checking && !file.usable()) || !said.empty();
-        std::string status = one.checking ? std::string(recomp::i18n::tr("Checking…"))
-                             : one.downloading ? std::string(recomp::i18n::tr("Downloading…"))
-                             : !said.empty() ? std::string()
-                                             : one.file_path.empty() ? std::string() : file.message;
+        std::string status = one.checking ? std::string("Checking…")
+                             : one.file_path.empty() ? std::string(one.about->file_empty)
+                                                     : file.message;
         ImGui::PushID(static_cast<int>(which));
         ImVec2 row_top = ImGui::GetCursorScreenPos();
         // (Play first, so that the ring coming into the row from the left is on it)
-        row(width, one.name.c_str(), status.c_str(), download ? (wrong ? 470.0f : 360.0f) : 230.0f, 36.0f, [&] {
+        row(width, one.name.c_str(), status.c_str(), 230.0f, 36.0f, [&] {
             if (ui::button(one.game.running() ? "Playing…" : "Play", Kind::Primary, 110.0f, usable && !one.game.running())) {
                 play(which);
             }
@@ -3151,7 +3017,7 @@ void App::library_page(float width) {
         // (the set chosen, by its own file's name, at the row's top right: a set's name is long, and a game's row
         // is the game's own; drawn after the row, at the place the row began)
         if (!one.file_path.empty()) {
-            std::string name = one.checking ? std::string(recomp::i18n::tr("Checking…"))
+            std::string name = one.checking ? std::string("Checking…")
                                             : std::filesystem::u8path(one.file_path).filename().u8string();
             name = ui::fit_end(name, Font::Regular, ui::size::kSmall, width * 0.42f);
             const float text_width = ui::text_size(name.c_str(), Font::Regular, ui::size::kSmall).x;
@@ -3159,12 +3025,6 @@ void App::library_page(float width) {
             ImGui::SetCursorScreenPos(ImVec2(row_top.x + width - px(18) - text_width, row_top.y + px(9)));
             ui::text(name.c_str(), Font::Regular, ui::size::kSmall, p.tertiary);
             ImGui::SetCursorScreenPos(resume);
-        }
-        // (a download that did not work: its own line, under the row, in the player's language)
-        if (!said.empty() && !one.downloading) {
-            ui::gap(6);
-            ui::text(said.c_str(), Font::Regular, ui::size::kDetail, p.secondary, width);
-            ui::gap(6);
         }
         if (!one.file_path.empty() && !one.checking) {
             ImVec2 center(row_top.x - px(14), row_top.y + px(24));
