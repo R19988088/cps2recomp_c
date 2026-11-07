@@ -3149,14 +3149,16 @@ void App::library_page(float width) {
             file_buttons(which, true);
         });
         // (the set chosen, by its own file's name, at the row's top right: a set's name is long, and a game's row
-        // is the game's own)
+        // is the game's own; drawn after the row, at the place the row began)
         if (!one.file_path.empty()) {
             std::string name = one.checking ? std::string(recomp::i18n::tr("Checking…"))
                                             : std::filesystem::u8path(one.file_path).filename().u8string();
             name = ui::fit_end(name, Font::Regular, ui::size::kSmall, width * 0.42f);
-            ImVec2 at(row_top.x + width - px(18) - ui::text_size(name.c_str(), Font::Regular, ui::size::kSmall).x, row_top.y + px(10));
+            const float text_width = ui::text_size(name.c_str(), Font::Regular, ui::size::kSmall).x;
+            ImVec2 resume = ImGui::GetCursorScreenPos();
+            ImGui::SetCursorScreenPos(ImVec2(row_top.x + width - px(18) - text_width, row_top.y + px(9)));
             ui::text(name.c_str(), Font::Regular, ui::size::kSmall, p.tertiary);
-            (void)at;
+            ImGui::SetCursorScreenPos(resume);
         }
         // (a download that did not work: its own line, under the row, in the player's language)
         if (!said.empty() && !one.downloading) {
