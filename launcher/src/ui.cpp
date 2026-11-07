@@ -69,32 +69,33 @@ void add_font(int index, const char* name) {
 // (the glyph ranges: the letters of every translation, in the form ImGui wants, kept as long as the fonts are)
 std::vector<ImWchar> g_ranges;
 
-// A font with Chinese glyphs merged into the launcher's own: Inter has none, so without it Chinese text is
-// boxes. The font is not compiled in (a full CJK font is several megabytes): it is read from beside the
-// program, or from the system's own. Merged into both faces, and only when the language is Chinese, so that
-// the other languages do not pay for its glyphs.
-//
-// The glyph ranges are the table's own letters, given up front: every one of them is in the atlas from the
-// first frame, which is what a text drawn straight to a draw list (a heading, a row's words) needs.
-void add_cjk() {
-    if (g_cjk_font.empty()) {
-        return;
-    }
+// The letters of every translation, as glyph ranges: every one of them is in the atlas from the first frame,
+// which is what a text drawn straight to a draw list (a heading, a row's words) needs.
+void make_ranges() {
     g_ranges.clear();
-    const std::vector<unsigned> points = recomp::i18n::translation_codepoints();
-    // (a range a letter, as the atlas takes them: two values each, ending in 0)
-    for (unsigned point : points) {
+    for (unsigned point : recomp::i18n::translation_codepoints()) {
+        // (a range a letter, as the atlas takes them: two values each, ending in 0)
         g_ranges.push_back(static_cast<ImWchar>(point));
         g_ranges.push_back(static_cast<ImWchar>(point));
     }
     g_ranges.push_back(0);
-    for (int index = 0; index < 2; index++) {
-        ImFontConfig config;
-        config.MergeMode = true;
-        config.OversampleH = 2;
-        config.OversampleV = 2;
-        ImGui::GetIO().Fonts->AddFontFromFileTTF(g_cjk_font.c_str(), size::kBody, &config, g_ranges.data());
+}
+
+// A font with Chinese glyphs, merged into the face just added: Inter has none, so without it Chinese is boxes.
+// The font is not compiled in (a full CJK font is several megabytes): it is read from beside the program, or
+// from the system's own.
+//
+// (MergeMode merges into the last face added, so this must come straight after that face's own AddFont, one
+// face at a time: a single loop over both would put every merge into the second face.)
+void add_cjk_merge() {
+    if (g_cjk_font.empty() || g_ranges.empty()) {
+        return;
     }
+    ImFontConfig config;
+    config.MergeMode = true;
+    config.OversampleH = 2;
+    config.OversampleV = 2;
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(g_cjk_font.c_str(), size::kBody, &config, g_ranges.data());
 }
 
 // Where a font with Chinese glyphs is: beside the program (fonts/cjk.ttf, which a release may carry), else
@@ -238,11 +239,18 @@ void apply_style(float value) {
 void load_fonts() {
     ImGui::GetIO().Fonts->Clear();
     g_cjk_font = find_cjk_font();
+    // (Chinese needs a font of its own, merged into each face right after it: only when it is the language)
+    const bool chinese = recomp::i18n::language() == recomp::i18n::Language::Chinese;
+    if (chinese) {
+        make_ranges();
+    }
     add_font(0, "font_regular");
+    if (chinese) {
+        add_cjk_merge();
+    }
     add_font(1, "font_semibold");
-    // (Chinese needs a font of its own, merged into both; only when it is the language)
-    if (recomp::i18n::language() == recomp::i18n::Language::Chinese) {
-        add_cjk();
+    if (chinese) {
+        add_cjk_merge();
     }
 }
 
