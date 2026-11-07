@@ -24,15 +24,15 @@
 
 ### `recomp-common/` 的正确改法
 
-它由 `tools/sync-common.sh` 从旁边的 `../recomp-common` 克隆复制而来（本机是
-`/Users/ddd/Documents/ai/recomp-common`，分支 `fork`）。要改启动器界面、菜单这类共享代码：
+它由 `tools/sync-common.sh` 从旁边的 `../recomp-common` 克隆复制而来（默认在
+仓库同级的 `../recomp-common`，分支 `fork`）。要改启动器界面、菜单这类共享代码：
 
 ```sh
-cd ~/Documents/ai/recomp-common
+cd ../recomp-common
 # 在 fork 分支上改，然后提交
 git add -A && git commit -m "..."
-cd ~/Documents/ai/cps2recomp
-RECOMP_COMMON=~/Documents/ai/recomp-common tools/sync-common.sh   # 同步回来
+cd <本仓库>
+RECOMP_COMMON=../recomp-common tools/sync-common.sh   # 同步回来
 tools/sync-common.sh --check   # 确认一致性（CI 也跑这个）
 ```
 
@@ -41,7 +41,7 @@ tools/sync-common.sh --check   # 确认一致性（CI 也跑这个）
 ## 三、日常跟随上游
 
 ```sh
-cd ~/Documents/ai/cps2recomp
+cd <本仓库>
 git fetch upstream
 git merge --ff-only upstream/main      # 能快进就快进
 ```
@@ -67,11 +67,11 @@ git rebase upstream/main
 上游偶尔会把 `recomp-common` pin 到更新的提交。这时要先把自己的 fork 也更新，再同步：
 
 ```sh
-cd ~/Documents/ai/recomp-common
+cd ../recomp-common
 git fetch origin
 git rebase origin/main        # 把 fork 分支（含 i18n 改动）挪到上游最新
-cd ~/Documents/ai/cps2recomp
-RECOMP_COMMON=~/Documents/ai/recomp-common tools/sync-common.sh
+cd <本仓库>
+RECOMP_COMMON=../recomp-common tools/sync-common.sh
 ```
 
 如果 rebase 冲突，冲突集中在这些文件：`src/settings.cpp`（翻译挂载）、`src/i18n.*`（新文件，不会冲突）、
