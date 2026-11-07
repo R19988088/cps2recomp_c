@@ -1107,7 +1107,8 @@ void App::download_game_file(size_t which) {
             }
             const int code = launcher::fetch_to_file(file.url, to);
             if (code != 0) {
-                failure = "Couldn't download " + file.name + ": " + launcher::fetch_problem(code) + ".";
+                failure = std::string(recomp::i18n::tr("Couldn't download ")) + file.name + ": " +
+                          recomp::i18n::tr(launcher::fetch_problem(code).c_str()) + ".";
                 break;
             }
             got.push_back(to);
@@ -1911,6 +1912,8 @@ void App::file_card(size_t which, float width) {
     ui::gap(10);
     Card card(width);
     const bool download = !one.about->download.files.empty();
+    double fraction = -1.0;
+    const std::string said = download_status(which, &fraction);
     const bool failed = !one.file_path.empty() && !one.checking && !file.usable();
     std::string shown;
     if (!one.file_path.empty()) {
@@ -1918,12 +1921,12 @@ void App::file_card(size_t which, float width) {
     } else {
         shown = download && !one.about->download.detail.empty() ? one.about->download.detail : std::string(one.about->file_empty);
     }
-    // (two buttons: Download and, beside it, Replace… — only once a file that was got is not the right one)
-    float controls = download && failed ? 270.0f : 130.0f;
+    // (two buttons, Download and Replace…, once there is something to replace: a file that is not the right one,
+    // or a download that did not work)
+    const bool two = download && (failed || !said.empty());
+    float controls = two ? 270.0f : 130.0f;
     shown = ui::fit_start(shown, Font::Regular, ui::size::kBody, width - px(controls) - px(70));
     std::string status;
-    double fraction = -1.0;
-    const std::string said = download_status(which, &fraction);
     if (one.checking) {
         status = "Checking…";
     } else if (one.downloading) {
@@ -1953,19 +1956,21 @@ void App::file_card(size_t which, float width) {
 }
 
 // A game file's buttons, in the row that has it: Download while it is not usable (the port knows where it is), and
-// Replace… beside it once a downloaded file is not the right one (the player's own copy, the way out of it). A port
-// with no download has Choose…, as before.
+// Replace… beside it once a file is there and is not the right one — a download that went wrong, or another release
+// — the player's own copy, the way out of both. A port with no download has Choose…, as before.
 void App::file_buttons(size_t which, bool compact) {
     Slot& one = *slots_[which];
     const bool download = !one.about->download.files.empty();
     FileCheck file;
+    std::string download_error;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         file = one.file;
+        download_error = one.download_error;
     }
     const bool busy = one.checking || one.downloading;
     const bool usable = !one.file_path.empty() && !one.checking && file.usable();
-    const bool failed = !one.file_path.empty() && !one.checking && !file.usable();
+    const bool failed = (!one.file_path.empty() && !one.checking && !file.usable()) || !download_error.empty();
     const float button = compact ? 110.0f : 130.0f;
     if (download && !usable) {
         std::string label = one.downloading ? "Downloading…" : "Download";
@@ -1973,7 +1978,7 @@ void App::file_buttons(size_t which, bool compact) {
             download_game_file(which);
         }
         if (!failed) {
-            return;  // (nothing chosen yet: Download alone; Replace… comes with a file that was not the right one)
+            return;  // (nothing chosen yet and nothing wrong: Download alone)
         }
         ImGui::SameLine(0.0f, px(10));
     }
@@ -3126,21 +3131,30 @@ void App::library_page(float width) {
         bool usable = !one.checking && !one.file_path.empty() && file.usable();
         const bool download = !one.about->download.files.empty();
         const std::string said = download_status(which);
+        // (a download that did not work keeps its own line under the row, so the detail here is the set's name once
+        // there is one, and what to download until then)
+        const bool wrong = (!one.file_path.empty() && !one.checking && !file.usable()) || !said.empty();
         std::string status = one.checking ? std::string("Checking…")
                              : one.downloading ? std::string(recomp::i18n::tr("Downloading…"))
-                             : !said.empty() ? said
+                             : !said.empty() ? std::string()
                              : one.file_path.empty() ? std::string(one.about->file_empty)
                                                      : file.message;
         ImGui::PushID(static_cast<int>(which));
         ImVec2 row_top = ImGui::GetCursorScreenPos();
         // (Play first, so that the ring coming into the row from the left is on it)
-        row(width, one.name.c_str(), status.c_str(), download ? 360.0f : 230.0f, 36.0f, [&] {
+        row(width, one.name.c_str(), status.c_str(), download ? (wrong ? 470.0f : 360.0f) : 230.0f, 36.0f, [&] {
             if (ui::button(one.game.running() ? "Playing…" : "Play", Kind::Primary, 110.0f, usable && !one.game.running())) {
                 play(which);
             }
             ImGui::SameLine(0.0f, px(10));
             file_buttons(which, true);
         });
+        // (a download that did not work: its own line, under the row, in the player's language)
+        if (!said.empty() && !one.downloading) {
+            ui::gap(6);
+            ui::text(said.c_str(), Font::Regular, ui::size::kDetail, p.secondary, width);
+            ui::gap(6);
+        }
         if (!one.file_path.empty() && !one.checking) {
             ImVec2 center(row_top.x - px(14), row_top.y + px(24));
             if (file.result == FileCheck::Result::Good) {
