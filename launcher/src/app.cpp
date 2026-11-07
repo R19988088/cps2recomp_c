@@ -2917,8 +2917,9 @@ void App::library_page(float width) {
     Card find(width);
     const std::string folder = prefs_.get("games", "folder");
     ImVec2 top = ImGui::GetCursorScreenPos();
-    float pad = px(18);
-    ImGui::SetCursorScreenPos(top + ImVec2(pad, px(14)));
+    // (the buttons at the card's right, as the rows under it have theirs)
+    const float controls = px(200.0f) + px(12) + px(36.0f);
+    ImGui::SetCursorScreenPos(ImVec2(top.x + width - px(18) - controls, top.y + px(14)));
     ImGui::BeginGroup();
     if (ui::button("Choose ROM folder", Kind::Secondary, 200.0f, !finding_)) {
 #ifdef __ANDROID__

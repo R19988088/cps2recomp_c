@@ -442,16 +442,17 @@ bool refresh_button(const char* id_text, float value, bool enabled) {
     float alpha = enabled ? 1.0f : 0.4f;
     ImRect shown = pressed_rect(rect, press);
     window->DrawList->AddRectFilled(shown.Min, shown.Max, fade(mix(p.control, p.control_hover, hover), alpha), box.x * 0.5f);
-    // (the arrow: a 300-degree arc, and a two-line head at its open end, turned as the arc's end points)
+    // (the arrow: an arc of a little more than three quarters of a circle, and its head at the end it stops at)
     const ImVec2 center((shown.Min.x + shown.Max.x) * 0.5f, (shown.Min.y + shown.Max.y) * 0.5f);
-    const float radius = px(7.0f);
+    const float radius = px(6.6f);
     const ImU32 ink = fade(p.secondary, alpha);
-    const float start = -IM_PI * 0.35f;
-    window->DrawList->PathArcTo(center, radius, start, start + IM_PI * 1.65f, 28);
+    const float start = -IM_PI * 0.62f;
+    const float end = start + IM_PI * 1.72f;
+    window->DrawList->PathArcTo(center, radius, start, end, 32);
     window->DrawList->PathStroke(ink, px(1.8f));
-    const ImVec2 tip(center.x + std::cos(start + IM_PI * 1.65f) * radius, center.y + std::sin(start + IM_PI * 1.65f) * radius);
-    window->DrawList->AddLine(tip, tip + ImVec2(px(3.4f), -px(3.8f)), ink, px(1.8f));
-    window->DrawList->AddLine(tip, tip + ImVec2(px(-1.6f), -px(4.8f)), ink, px(1.8f));
+    const ImVec2 tip(center.x + std::cos(end) * radius, center.y + std::sin(end) * radius);
+    window->DrawList->AddLine(tip, tip + ImVec2(-px(3.6f), -px(2.6f)), ink, px(1.8f));
+    window->DrawList->AddLine(tip, tip + ImVec2(px(0.4f), -px(4.4f)), ink, px(1.8f));
     focus_ring(rect, id, box.x * 0.5f);
     return pressed;
 }
