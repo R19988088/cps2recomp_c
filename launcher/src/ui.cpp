@@ -105,7 +105,7 @@ std::string find_cjk_font() {
     if (const char* base = SDL_GetBasePath()) {
         places.push_back(std::filesystem::u8path(base) / "fonts" / "cjk.ttf");
         places.push_back(std::filesystem::u8path(base) / "cjk.ttf");
-        SDL_free(const_cast<char*>(base));
+        // (not freed: since SDL 3.4 this is the library's own copy, freed by SDL_Quit)
     }
 #ifdef _WIN32
     places.push_back("C:/Windows/Fonts/msyh.ttc");     // Microsoft YaHei
