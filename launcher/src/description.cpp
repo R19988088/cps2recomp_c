@@ -184,11 +184,6 @@ std::vector<FeatureSwitch> feature_switches(const std::string& all) {
     return list;
 }
 
-// Where the launcher gets a set from: a MAME 0.245 set, split (a set's zip has only its own files, the ones it shares
-// with its parent set's zip). It is the set the port was made from, or one of its others (the same program in another
-// region), and the parent's zip beside it: the graphics and sound a set shares with its parent are in that one.
-const char* const kDownloadBase = "https://archive.org/download/mame-0.245-roms-split/MAME%200.245%20ROMs%20%28split%29/";
-
 // What a launcher is told about one game
 launcher::Description describe_game(const GameInfo& game) {
     launcher::Description d;
@@ -242,21 +237,9 @@ launcher::Description describe_game(const GameInfo& game) {
 #else
     d.file_empty = keep("None chosen. Drop " + std::string(game.rom_set) + ".zip or its folder here, or choose the zip.");
 #endif
-    d.file_not_set_up = "The game isn't set up yet. Open the launcher (without --play) once to get your ROM set.";
+    d.file_not_set_up = "The game isn't set up yet. Open the launcher (without --play) once to choose your ROM set.";
     d.file_filter = {"ROM set (zip)", "zip"};
     d.file_key = "rom";
-    // (the set, and its parent's zip beside it where a split collection keeps what they share: `<set>.zip` and
-    // `<parent>.zip` in the player's folder's roms/)
-    {
-        const std::string set_zip = std::string(game.rom_set) + ".zip";
-        d.download.files.push_back({std::string(kDownloadBase) + set_zip, set_zip});
-        if (*game.rom_parent && std::string(game.rom_parent) != game.rom_set) {
-            const std::string parent_zip = std::string(game.rom_parent) + ".zip";
-            d.download.files.push_back({std::string(kDownloadBase) + parent_zip, parent_zip});
-        }
-        const bool split = *game.rom_parent && std::string(game.rom_parent) != game.rom_set;
-        d.download.detail = keep("None yet: download " + set_zip + (split ? " and " + std::string(game.rom_parent) + ".zip." : "."));
-    }
     d.check = [game](const std::string& path) { return check_rom_set(game, path); };
     d.find_nearby = [game](const std::filesystem::path& folder) { return rom_set_nearby(game, folder); };
     d.candidates = [game](const std::filesystem::path& folder) { return rom_set_candidates(game, folder); };
@@ -394,15 +377,15 @@ const launcher::Collection& launcher::describe_collection() {
                   "drive: they are copied into the app's folder.\n\n"
                   "While playing, Back or the screen's Menu button, or the left stick's click (or Start and Select together) on a gamepad, "
                   "opens the in-game menu.";
-        c.find_title = "Add your sets";
-        c.find_detail = "Choose the ROM sets, as many as you like at once, by the set's name (sfa2u.zip, say). Each goes to its game.";
+        c.find_title = "Add ROM folder";
+        c.find_detail = "The folder your ROM sets are in. They are copied into the app's folder.";
 #else
         c.intro = "Each game needs your own copy of it: its arcade ROM set (a CPS-2 game's with its key file). Show the launcher the folder you keep them in, "
                   "or drop a set (or the folder) on this window. The sets stay where they are: the launcher only reads them.\n\n"
                   "While playing, Esc or F1 on the keyboard, or the left stick's click (or Start and Select together) on a gamepad, "
                   "opens the in-game menu.";
-        c.find_title = "Look in a folder";
-        c.find_detail = "Finds each game's ROM set in a folder of them, by the set's name (sfa2u.zip, say).";
+        c.find_title = "Choose ROM folder";
+        c.find_detail = "The folder your ROM sets are in.";
 #endif
         for (const GameInfo& game : kGames) {
             c.games.push_back({game.id, game.name, game.id, "", describe_game(game), *game.series ? game.series : nullptr});

@@ -1106,13 +1106,18 @@ void App::find_in(const std::string& path) {
         std::error_code error;
         std::filesystem::path given = std::filesystem::u8path(path);
         for (const auto& [which, about] : games) {
-            std::vector<std::filesystem::path> tries = {given};
-            if (about->candidates && std::filesystem::is_directory(given, error)) {
-                std::vector<std::filesystem::path> more = about->candidates(given);
-                tries.insert(tries.end(), more.begin(), more.end());
+            // (a folder's own candidates first: the set's zip and its parent's, by name, then the folder itself)
+            std::vector<std::filesystem::path> tries;
+            std::error_code error;
+            const bool directory = std::filesystem::is_directory(given, error);
+            if (directory && about->candidates) {
+                tries = about->candidates(given);
             }
+            tries.push_back(given);
             for (const std::filesystem::path& one : tries) {
-                if (std::filesystem::exists(one, error) && about->check(one.u8string()).usable()) {
+                std::error_code ignored;
+                if (std::filesystem::exists(one, ignored) && !std::filesystem::is_directory(one, ignored) &&
+                    about->check(one.u8string()).usable()) {
                     found.push_back({which, one.u8string()});
                     break;
                 }
@@ -1846,19 +1851,12 @@ void App::file_card(size_t which, float width) {
     card.end();
 }
 
-// The game file's button in its row, to choose another (a gamepad gets the launcher's own browser)
+// The game file's button in its row, to choose it or choose another (a gamepad gets the launcher's own browser)
 void App::file_buttons(size_t which, bool compact) {
     Slot& one = *slots_[which];
-    FileCheck file;
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        file = one.file;
-    }
     const bool busy = one.checking;
-    const bool usable = !one.file_path.empty() && !one.checking && file.usable();
     const float button = compact ? 110.0f : 130.0f;
-    std::string label = one.file_path.empty() || !usable ? "Choose…" : "Replace…";
-    if (ui::button(label.c_str(), Kind::Secondary, button, !busy)) {
+    if (ui::button("Choose…", Kind::Secondary, button, !busy)) {
         // (the system's file dialog wants a mouse or a keyboard)
         if (ui::gamepad_in_use()) {
             open_browser(which, false);
@@ -2912,40 +2910,33 @@ void App::library_page(float width) {
 #ifdef LAUNCHER_UPDATE_REPO
     update_card(width, true, true);  // (above the games, new version or not)
 #endif
-    // (one row: the folder the games are in, and looking in it again. Its games are shown under it, each as it is
-    // found, so the row says nothing but the folder when one is chosen)
+    // (one row, with no words of its own: the folder is chosen with the button, and looked in again with the arrow
+    // beside it for a set dropped in since. What the look found, or is doing, is said under the title of the games)
     Card find(width);
-    std::string detail = finding_ ? std::string("Looking…")
-                        : find_message_.empty() ? std::string(collection_->find_detail)
-                                                : find_message_;
     const std::string folder = prefs_.get("games", "folder");
-    if (!folder.empty() && !finding_ && find_message_.empty()) {
-        detail = ui::fit_start(folder, Font::Regular, ui::size::kDetail, width - px(300));
-    }
-    row(width, collection_->find_title, detail.c_str(), 220.0f, 36.0f, [&] {
+    ImVec2 top = ImGui::GetCursorScreenPos();
+    // (the buttons at the card's right, as the rows under it have theirs)
+    const float controls = px(200.0f) + px(12) + px(36.0f);
+    ImGui::SetCursorScreenPos(ImVec2(top.x + width - px(18) - controls, top.y + px(14)));
+    ImGui::BeginGroup();
+    if (ui::button("Choose ROM folder", Kind::Secondary, 200.0f, !finding_)) {
 #ifdef __ANDROID__
-        // (Android: the sets themselves are chosen, and copied into the launcher's folder: choose_folder)
-        const char* label = "Add ROM sets…";
-        const bool browse = false;
+        choose_folder();  // (the sets chosen are copied into the app's folder: choose_folder)
 #else
-        const char* label = "Choose folder…";
-        const bool browse = ui::gamepad_in_use();
+        if (ui::gamepad_in_use()) {
+            open_browser(kAnyGame, true);
+        } else {
+            choose_folder();
+        }
 #endif
-        if (ui::button(label, Kind::Secondary, 150.0f, !finding_)) {
-            if (browse) {
-                open_browser(kAnyGame, true);
-            } else {
-                choose_folder();
-            }
-        }
-        // (looking in the folder chosen last again, for a set dropped in beside the others since)
-        if (!folder.empty()) {
-            ImGui::SameLine(0.0f, px(14));
-            if (ui::refresh_button("##find-again", 36.0f, !finding_)) {
-                find_in(folder);
-            }
-        }
-    });
+    }
+    ImGui::SameLine(0.0f, px(12));
+    if (ui::refresh_button("##find-again", 36.0f, !folder.empty() && !finding_)) {
+        find_in(folder);
+    }
+    ImGui::EndGroup();
+    ImGui::SetCursorScreenPos(ImVec2(top.x, ImGui::GetItemRectMax().y + px(14)));
+    ImGui::Dummy(ImVec2(width, 0));
     find.end();
     ui::gap(24);
     ui::text("GAMES", Font::Semibold, ui::size::kDetail, p.secondary);
@@ -3813,14 +3804,16 @@ void App::features_page(float width) {
         bool differ = std::any_of(where.begin(), where.end(), [&](const auto& at) { return values[at.first][at.second] != value; });
         std::string note;
         if (where.size() < here) {
-            note = "Only in ";
+            // (built from pieces, each passed through tr(): a game's name is its own, the joining words are not)
+            note = recomp::i18n::tr("Only in ");
             for (size_t k = 0; k < where.size(); k++) {
-                note += (k == 0 ? "" : k + 1 == where.size() ? " and " : ", ") + slots_[where[k].first]->name;
+                note += (k == 0 ? "" : k + 1 == where.size() ? recomp::i18n::tr(" and ") : recomp::i18n::tr(", ")) +
+                        slots_[where[k].first]->name;
             }
-            note += ".";
+            note += recomp::i18n::tr(".");
         }
         if (differ) {
-            note += std::string(note.empty() ? "" : " ") + "Not the same in every game yet: what you choose here is.";
+            note += std::string(note.empty() ? "" : " ") + recomp::i18n::tr("Not the same in every game yet: what you choose here is.");
         }
         rows.push_back({&shared.info, value, note, i});
     }
