@@ -3131,14 +3131,13 @@ void App::library_page(float width) {
         bool usable = !one.checking && !one.file_path.empty() && file.usable();
         const bool download = !one.about->download.files.empty();
         const std::string said = download_status(which);
-        // (a download that did not work keeps its own line under the row, so the detail here is the set's name once
-        // there is one, and what to download until then)
+        // (a download that did not work keeps its own line under the row. A row with no set chosen says nothing:
+        // the row's name is the game's, and the set's own file name goes at the row's end once there is one)
         const bool wrong = (!one.file_path.empty() && !one.checking && !file.usable()) || !said.empty();
-        std::string status = one.checking ? std::string("Checking…")
+        std::string status = one.checking ? std::string(recomp::i18n::tr("Checking…"))
                              : one.downloading ? std::string(recomp::i18n::tr("Downloading…"))
                              : !said.empty() ? std::string()
-                             : one.file_path.empty() ? std::string(one.about->file_empty)
-                                                     : file.message;
+                                             : one.file_path.empty() ? std::string() : file.message;
         ImGui::PushID(static_cast<int>(which));
         ImVec2 row_top = ImGui::GetCursorScreenPos();
         // (Play first, so that the ring coming into the row from the left is on it)
@@ -3149,6 +3148,16 @@ void App::library_page(float width) {
             ImGui::SameLine(0.0f, px(10));
             file_buttons(which, true);
         });
+        // (the set chosen, by its own file's name, at the row's top right: a set's name is long, and a game's row
+        // is the game's own)
+        if (!one.file_path.empty()) {
+            std::string name = one.checking ? std::string(recomp::i18n::tr("Checking…"))
+                                            : std::filesystem::u8path(one.file_path).filename().u8string();
+            name = ui::fit_end(name, Font::Regular, ui::size::kSmall, width * 0.42f);
+            ImVec2 at(row_top.x + width - px(18) - ui::text_size(name.c_str(), Font::Regular, ui::size::kSmall).x, row_top.y + px(10));
+            ui::text(name.c_str(), Font::Regular, ui::size::kSmall, p.tertiary);
+            (void)at;
+        }
         // (a download that did not work: its own line, under the row, in the player's language)
         if (!said.empty() && !one.downloading) {
             ui::gap(6);
