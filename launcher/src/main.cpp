@@ -322,7 +322,8 @@ int main(int argc, char** argv) {
         window_height = std::min(window_height, usable.h);
         least_width = std::min(least_width, usable.w);
         least_height = std::min(least_height, usable.h);
-    }    SDL_Window* window = SDL_CreateWindow(LAUNCHER_GAME_NAME, window_width, window_height,
+    }
+    SDL_Window* window = SDL_CreateWindow(LAUNCHER_GAME_NAME, window_width, window_height,
                                           SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY);
     SDL_Renderer* renderer = window ? SDL_CreateRenderer(window, nullptr) : nullptr;
     if (!renderer) {
