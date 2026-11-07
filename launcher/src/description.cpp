@@ -9,7 +9,7 @@
 
 #include "launcher.h"
 
-#include "chinese.h"
+#include "../../port/i18n_table.h"
 
 #include "../../machine/romset.h"
 #include "../../port/bindings.h"
@@ -188,7 +188,7 @@ std::vector<FeatureSwitch> feature_switches(const std::string& all) {
 launcher::Description describe_game(const GameInfo& game) {
     launcher::Description d;
     // (the launcher's words in Chinese: launcher/src/chinese.cpp; it installs them before it draws)
-    d.translations = LauncherTranslations();
+    d.translations = PortTranslations();
     const std::string set = sets_named(game);
     d.original = "in the arcade";
     d.file_heading = "ROM SET";

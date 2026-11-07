@@ -23,6 +23,8 @@
 #include "../recomp-common/proxy.h"
 #include "../recomp-common/settings.h"
 #include "../recomp-common/text.h"
+#include "../recomp-common/i18n.h"
+#include "i18n_table.h"
 
 #include <SDL3/SDL_main.h> // (on Windows the game is a windowed program: its main is called from WinMain)
 
@@ -387,6 +389,14 @@ bool Port::Init(std::string &error) {
     machine->cpu.keepHistory = getenv("CPS2RECOMP_PC_HISTORY") != nullptr;
     RegisterPortFeatures();
     LoadFeatures(opt.settingsPath, opt.features);
+    // The player's language (launcher.ini's [launcher] language, which the launcher writes): the port's table
+    // first, so that the language chosen is one it has.
+    recomp::i18n::set_translations(PortTranslations());
+    {
+        recomp::Ini prefs(LauncherFolder() / "launcher.ini");
+        prefs.load();
+        recomp::i18n::set_language(prefs.get("launcher", "language"));
+    }
     // The 68000 and the Z80 are run the same way; each falls back to its interpreter if the build has no
     // translated code for it
     if (opt.cpu.empty()) {

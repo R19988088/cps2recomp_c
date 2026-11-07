@@ -9,8 +9,11 @@
 // This file is the port's own, not recomp-common's: an upstream update leaves it alone. A text not here
 // is drawn in English. The in-game menu's 5x7 font has the letters of English only, so the menu stays in
 // English (recomp-common's Menu::Draw says why).
+//
+// It is in port/ rather than launcher/src/ because the game program sets the same table (port/main.cpp): the
+// words around the picture are the launcher's table too, so that one list has every word in one language.
 
-#include "chinese.h"
+#include "i18n_table.h"
 
 #include <vector>
 
@@ -93,7 +96,8 @@ const std::vector<Translation> kChinese = {
     {"Start the game with no sound. The game's menu switches it back on.", "以静音启动游戏。游戏内菜单可以重新打开声音。"},
     {"Start the games with no sound. A game's menu switches it back on.", "以静音启动游戏。游戏内菜单可以重新打开声音。"},
     {"Language", "语言"},
-    {"What the launcher and the games' own menus are drawn in.", "启动器和游戏内菜单使用的语言。"},
+    {"What the launcher is drawn in. The in-game menu keeps English: its 5x7 font has no other letters.",
+     "启动器使用的语言。游戏内菜单保持英文：它的 5x7 点阵字体没有其他字母。"},
     {"Settings, saves, save states and the logs.", "设置、存档、即时存档和日志。"},
 
     // ---- the Features page ----
@@ -312,6 +316,6 @@ const std::vector<Translation> kChinese = {
 } // namespace
 
 // The table, for launcher::Description::translations (the launcher installs it before it draws).
-std::vector<recomp::i18n::Translation> LauncherTranslations() {
+std::vector<recomp::i18n::Translation> PortTranslations() {
     return kChinese;
 }

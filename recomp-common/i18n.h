@@ -36,7 +36,7 @@ const char *name(Language language);
 // table is installed.
 const std::vector<Language> &languages();
 
-// The port's table, installed once at the start: it must outlive the program (a static array).
+// The port's table, installed once at the start. Copied: the port may hand a temporary.
 void set_translations(const std::vector<Translation> &table);
 
 // Every text of the table's translations, joined: the letters a font must have to draw them (a launcher

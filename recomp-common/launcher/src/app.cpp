@@ -1943,7 +1943,8 @@ void App::language_card(float width) {
             chosen = static_cast<int>(i);
         }
     }
-    row(width, "Language", "What the launcher and the games' own menus are drawn in.", 190.0f, 36.0f, [&] {
+    row(width, "Language", "What the launcher is drawn in. The in-game menu keeps English: its 5x7 font has no other letters.",
+        190.0f, 36.0f, [&] {
         if (ui::dropdown("##language", names, chosen, 190.0f)) {
             set_language(languages[static_cast<size_t>(chosen)]);
         }
