@@ -5,6 +5,15 @@ a minor version. A port's copy only changes when it runs `tools/sync-common.sh`.
 
 ## Unreleased
 
+- **The words a port draws, in the player's language** (`src/i18n.h`): a port gives its `Description` a table of
+  English text and its translation (`Description::translations`); the launcher's drawing code (`ui::text`, `button`,
+  `dropdown`, `nav_item`, `list_item`, `layout::heading`) asks `tr()` for each, so a row whose English upstream changed
+  is simply unused rather than a build error. The language is the player's, kept in launcher.ini's `[launcher]
+  language`, with a Language row on the Game page (and on the Features page where there is no Game page). Chinese is
+  drawn by a face read from the system or beside the program (`fonts/cjk.ttf`), not compiled in, merged into each of
+  the launcher's two faces and given the table's own letters as its glyph ranges, so a text drawn straight to a draw
+  list has every letter from the first frame. The in-game menu's 5x7 font has English's letters only, so the menu
+  stays in English (`i18n::Untranslated`), rather than drawing "?" for every other letter.
 - **The menu's arrows repeat while held** (`MenuRepeat`, C `rmenu_repeat`): a host gives it what is down each frame and
   gets the presses, Up, Down, Left and Right again after a moment's hold, and faster after a second.
 - **Favourites in the menu** (`MenuFeature::favourites`, `MenuConfig::favourite` and `setFavourite`): a long choice
