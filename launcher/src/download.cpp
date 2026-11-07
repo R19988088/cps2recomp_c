@@ -23,6 +23,19 @@ bool url_allowed(const std::string& url) {
     return url.rfind("https://", 0) == 0 || url.rfind("http://", 0) == 0 || url.rfind("file://", 0) == 0;
 }
 
+// archive.org's URLs name the set by a path, and its server may answer with another host's (dn721900.ca....):
+// curl's own address of the file (its effective URL) is what is told it, so that the redirect's host is the one
+// written to. That keeps the URL as it was given the one the port vouched for (url_allowed above).
+std::string follow_redirects(const std::string& url) {
+    std::string output;
+    if (run_program(curl_program(), {"-fsSLI", "--connect-timeout", "20", "-o", "/dev/null", "-w", "%{url_effective}", "-A", "recomp-launcher", url},
+                    &output) == 0 &&
+        output.rfind("https://", 0) == 0) {
+        return output;
+    }
+    return url;
+}
+
 }  // namespace
 
 fs::path part_of(const fs::path& to) {
@@ -39,13 +52,21 @@ int fetch_to_file(const std::string& url, const fs::path& to) {
     fs::create_directories(to.parent_path(), error);
     const fs::path part = part_of(to);
     fs::remove(part, error);
-    const int code = run_program(curl_program(),
-                                 {"-fsSL", "--connect-timeout", "20", "--speed-limit", "1024", "--speed-time", "60", "--retry", "2", "-A",
-                                  "recomp-launcher", "-o", part.u8string(), url},
-                                 nullptr);
+    // (a transfer that is cut short — archive.org does that now and then — is a network error, which --retry alone
+    // does not retry: --retry-all-errors does, and resumes where the file got to, which --speed-limit/time guard
+    // against a server that has stalled. The whole download is tried a few times before the player is told.)
+    const std::vector<std::string> args = {"-fsSL",  "--connect-timeout", "20", "--speed-limit", "1024", "--speed-time", "60",
+                                           "--retry", "5", "--retry-delay", "2", "--retry-all-errors", "-C", "-", "-A", "recomp-launcher",
+                                           "-o",      part.u8string(),   url};
+    int code = run_program(curl_program(), args, nullptr);
     if (code != 0) {
         fs::remove(part, error);
-        return code;
+        // (a second whole try: `-C -` with nothing to resume starts the file again)
+        code = run_program(curl_program(), args, nullptr);
+        if (code != 0) {
+            fs::remove(part, error);
+            return code;
+        }
     }
     fs::rename(part, to, error);
     if (error) {
