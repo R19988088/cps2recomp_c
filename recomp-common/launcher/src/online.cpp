@@ -3,6 +3,7 @@
 #include "online.h"
 
 #include "run_program.h"
+#include "sha256.h"
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -322,6 +323,14 @@ std::string new_room_secret() {
         secret += kHex[random() & 15];
     }
     return secret;
+}
+
+std::string room_id(const std::string& secret) {
+    // (the service's own: the secret's SHA-256, its first 6 bytes in hex)
+    if (secret.size() < 16) {
+        return "";
+    }
+    return sha256_hex(secret).substr(0, 12);
 }
 
 }  // namespace launcher

@@ -401,6 +401,22 @@ int play_directly(const std::string& id, const std::vector<std::string>& extra) 
     }
     std::filesystem::create_directories(target->folder / "logs", error);
     std::vector<std::string> arguments = arguments_for(prefs, *target);
+    // (the online switch on: it hosts from here too, as from Play, so a Steam shortcut starts a match. The switch is
+    // for the game it names; with none named yet, it is for the first game played)
+    const std::string named = prefs.get("online", "on_game");
+    if (prefs.get("online", "on") == "1" && about.online.host_argument && (named.empty() || named == id)) {
+        arguments.push_back(about.online.host_argument);
+        if (about.online.name_argument && !prefs.get("online", "name").empty()) {
+            if (about.online.lobby && about.online.list_argument) {
+                arguments.push_back(about.online.list_argument);
+            }
+            arguments.push_back(about.online.name_argument);
+            arguments.push_back(prefs.get("online", "name"));
+        }
+        if (about.online.arcade_argument && prefs.get("online", "arcade") == "1") {
+            arguments.push_back(about.online.arcade_argument);
+        }
+    }
     arguments.insert(arguments.end(), extra.begin(), extra.end());
     if (!game.start(program_path(target->exe), arguments, target->folder, message, target->folder / "logs" / "game.log")) {
         say(SDL_MESSAGEBOX_ERROR, target->name, message);
@@ -1388,6 +1404,10 @@ void App::frame() {
             after_game(one);
             show_focus_ = interactive_ && SDL_HasGamepad();  // (back from the game with a gamepad in hand)
             one.was_running = false;
+            // (the game over: the switch goes off with it)
+            if (online_on()) {
+                set_online_on(false, which);
+            }
             if (multi_.mode >= 0 && multi_.at < multi_.games.size() && multi_.games[multi_.at] == which) {
                 multi_after(one.game.exit_code() == collection_->multi[static_cast<size_t>(multi_.mode)].next_code);
             }
@@ -1530,7 +1550,8 @@ void App::sidebar(float height) {
     auto row_y = [&](float index) { return top + index * step + (collection_ && index > fixed - 0.5f ? games_gap : 0.0f); };
     int count = page_count();
     float view_top = top - px(4);
-    float view_bottom = height - px(56);
+    // (the foot has the online switch under the list)
+    float view_bottom = height - (room_url() ? px(96) : px(56));
     float max_scroll = std::max(0.0f, row_y(static_cast<float>(count - 1)) + px(36) + px(4) - view_bottom);
     // (the row the ring is on, while it is in the sidebar; else the page shown's)
     auto want_row = [&] { return in_sidebar_ && ui::focus_shown() && focus_row_ >= 0 ? focus_row_ : page_; };
@@ -1730,6 +1751,38 @@ void App::sidebar(float height) {
     }
     in_sidebar_ = in_sidebar;
     focus_seen_ = focused;
+    // The foot of the sidebar: online play, as the Online page has it in one move — the player's id, and a switch that
+    // is the room's state. On, it waits in the waiting room (so an invite reaches the player without a game started),
+    // and the game of the page shown is started hosting, as that page's Host does.
+#ifdef LAUNCHER_ONLINE_SWITCH
+    if (room_url() && slots_.size() > 0) {
+        const size_t on_for = online_game();
+        const bool on = online_on();
+        // (the game the switch is for: the one whose page is shown, else the one it was last on for)
+        const size_t target = shown_kind == Page::Title || shown_kind == Page::Series ? shown_game : online_game();
+        const float foot = height - px(104);
+        ImGui::SetCursorScreenPos(origin + ImVec2(px(24), foot));
+        const std::string id = room_id();
+        ui::text(id.empty() ? "Online ID: …" : ("Online ID " + id).c_str(), Font::Regular, ui::size::kSmall, p.tertiary, px(inner));
+        ImGui::SetCursorScreenPos(origin + ImVec2(px(24), foot + px(18)));
+        if (ui::toggle("##sidebar_online", on)) {
+            if (on) {
+                set_online_on(false, on_for < slots_.size() ? on_for : target);
+            } else {
+                // (on: the room's state. A game ready to play is started hosting, as the Online page's Host does.)
+                set_online_on(true, target);
+                if (target < slots_.size() && can_play(target)) {
+                    play(target, host_arguments(slots_[target]->about->online));
+                }
+            }
+        }
+        ImGui::SameLine(0.0f, px(8));
+        const std::string note = !on ? std::string("Online play")
+                                 : on_for < slots_.size() ? std::string("Online: ") + slots_[on_for]->name
+                                                          : std::string("Online: waiting");
+        ui::text(note.c_str(), Font::Regular, ui::size::kSmall, on ? p.accent : p.tertiary, px(inner) - px(46));
+    }
+#endif
     ImGui::SetCursorScreenPos(origin + ImVec2(px(24), height - px(36)));
     ui::text(LAUNCHER_DISCLAIMER, Font::Regular, ui::size::kSmall, p.tertiary, px(inner));
 }
@@ -1770,7 +1823,9 @@ void App::page(float width, float height) {
     }
     if (room_url()) {
         const bool online_page = collection_ || about_.online_page;
-        follow_room(kind == (online_page ? Page::Online : Page::Game) && !any_running());
+        // (checked in while the switch is on, from any page, or while the Online page is open; never beside a running
+        // game, which is in the room itself)
+        follow_room(!any_running() && (online_on() || kind == (online_page ? Page::Online : Page::Game)));
     }
     switch (kind) {
     case Page::Game:
@@ -2004,7 +2059,7 @@ bool App::play_button(size_t which, float width) {
         ui::gap(12);
     }
     if (ui::button(one.game.running() ? "Playing…###play" : "Play###play", Kind::Primary, 200.0f, ready, 48.0f)) {
-        play(which);
+        play(which, online_arguments(which));
     }
     // With a gamepad in hand the ring starts on Play, once there is a game to play
     if (start_focus_ != 0 && ImGui::GetFocusID() != start_focus_) {
@@ -2134,6 +2189,22 @@ void App::online_card(size_t which, float width, bool ready) {
     }
 }
 
+// A service URL with [online] service's address in place of the one the build names, when the player set one (a
+// service of their own: online/README.md). The path is kept, so every entry follows the same service.
+std::string App::service(const char* url) const {
+    const std::string mine = prefs_.get("online", "service");
+    if (!url || url[0] == '\0' || mine.empty()) {
+        return url ? std::string(url) : std::string();
+    }
+    const size_t path = std::string(url).find('/', std::string(url).find("//") + 2);
+    const std::string rest = path == std::string::npos ? std::string() : std::string(url).substr(path);
+    std::string base = mine;
+    while (!base.empty() && base.back() == '/') {
+        base.pop_back();
+    }
+    return base + rest;
+}
+
 const char* App::room_url() const {
     return collection_ ? collection_->room : about_.online.room;
 }
@@ -2144,6 +2215,89 @@ int App::room_protocol() const {
 
 std::string App::room_game(size_t which) const {
     return collection_ || !about_.online.game ? slots_[which]->id : about_.online.game;
+}
+
+// The player's id in the waiting room, as launcher.ini keeps it: plain text, so that it is shown without asking the
+// service, stays the same across services, and may be typed in.
+std::string App::room_id() {
+    if (room_id_.empty()) {
+        room_id_ = prefs_.get("online", "id");
+        // (no id kept yet: made from a secret of the player's own, as the service makes it)
+        if (room_id_.size() != 12) {
+            if (prefs_.get("online", "room").size() != 32) {
+                prefs_.set("online", "room", launcher::new_room_secret());
+            }
+            room_id_ = launcher::room_id(prefs_.get("online", "room"));
+            if (room_id_.size() == 12) {
+                prefs_.set("online", "id", room_id_);
+                prefs_.save();
+            }
+        }
+    }
+    return room_id_;
+}
+
+void App::set_room_id(const std::string& id) {
+    std::string kept;
+    for (const char c : id) {
+        if (std::isxdigit(static_cast<unsigned char>(c)) && kept.size() < 12) {
+            kept += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+    }
+    if (kept.size() != 12 || kept == room_id()) {
+        return;
+    }
+    // (an id is what the service makes of a secret, so what was typed cannot simply be kept: a new secret is made,
+    // and the id shown is the one it gives)
+    room_id_.clear();
+    prefs_.set("online", "room", launcher::new_room_secret());
+    prefs_.set("online", "id", "");
+    prefs_.save();
+    room_id();
+    room_at_ = 0;  // (the room is asked again at once, so that the old id is not left in it)
+}
+
+bool App::online_on() const {
+#ifdef LAUNCHER_ONLINE_SWITCH
+    return prefs_.get("online", "on") == "1";
+#else
+    return false;  // (built without the switch: nothing in launcher.ini turns online play on by itself)
+#endif
+}
+
+size_t App::online_game() const {
+    const std::string id = prefs_.get("online", "on_game");
+    for (size_t which = 0; which < slots_.size(); which++) {
+        if (slots_[which]->id == id) {
+            return which;
+        }
+    }
+    return slots_.size();
+}
+
+// The switch: the Online page's "choose a game, then Host" in one move. It starts that game with the Online card's
+// own host arguments (exactly as that button does), so every game that can host online hosts from the switch too, and
+// nothing of the game is changed for it. What it is on for is kept, so that the switch shows the match while it runs.
+void App::set_online_on(bool on, size_t which) {
+    if (on && which < slots_.size()) {
+        prefs_.set("online", "on_game", slots_[which]->id);
+    }
+    prefs_.set("online", "on", on ? "1" : "0");
+    prefs_.save();
+    room_at_ = 0;  // (in the waiting room, or out, at once)
+}
+
+// What Play starts the game with while the online switch is on: the match's own, as the Online page's Host gives
+// them. The switch is on for the game it was switched on at (or for the first one played after it was switched on).
+std::vector<std::string> App::online_arguments(size_t which) const {
+    if (!online_on() || which >= slots_.size() || !slots_[which]->about->online.host_argument) {
+        return {};
+    }
+    const size_t on_for = online_game();
+    if (on_for < slots_.size() && on_for != which) {
+        return {};
+    }
+    return host_arguments(slots_[which]->about->online);
 }
 
 std::vector<std::string> App::host_arguments(const launcher::Online& online) const {
@@ -2278,6 +2432,9 @@ bool App::version_matches(const std::string& version) {
 }
 
 bool App::can_play(size_t which) const {
+    if (which >= slots_.size()) {
+        return false;
+    }
     const Slot& one = *slots_[which];
     bool usable;
     {
@@ -2321,7 +2478,7 @@ void App::online_page(float width) {
         invitations_card(width);
     }
     // Every game's open matches, by game, in the sidebar's order; highlighted while one can be joined
-    follow_lobby(collection_->lobby);
+    follow_lobby(service(collection_->lobby));
     const auto joinable = [&](const launcher::OpenMatch& match, size_t which) {
         std::lock_guard<std::mutex> lock(mutex_);
         return slots_[which]->id == match.game && version_matches(match.version) && !slots_[which]->checking && slots_[which]->file.usable();
@@ -2479,7 +2636,7 @@ void App::online_page(float width) {
                         }
                     }
                 } else if (ui::button(asking ? "Joining…" : "Join", Kind::Secondary, 130.0f, !asking && !code.empty())) {
-                    join_lookup_ = std::async(std::launch::async, [url = std::string(collection_->code_lookup) + code] { return launcher::lookup_code(url); });
+                    join_lookup_ = std::async(std::launch::async, [url = service(collection_->code_lookup) + code] { return launcher::lookup_code(url); });
                 }
             });
         join.end();
@@ -2560,13 +2717,18 @@ void App::online_page(float width) {
 }
 
 void App::follow_room(bool here) {
-    const std::string url = room_url();
+    load_online();  // (the name and the id are kept in launcher.ini: a check-in from any page has them)
+    const std::string url = service(room_url());
+    // (a game that is running is in the waiting room itself, on the one secret: the launcher neither checks in nor
+    // leaves while it does, or leaving would take the game out of the room)
+    const bool playing = any_running();
+    const bool checking_in = here && !playing;
     if (room_fetch_.valid() && room_fetch_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
         launcher::Room room = room_fetch_.get();
         room_at_ = SDL_GetTicks();
-        if (!room_in_) {
+        if (!checking_in) {
             // (left while it was asked: out again)
-            if (room.ok) {
+            if (room.ok && !playing) {
                 launcher::room_leave(url, prefs_.get("online", "room"));
             }
         } else if (room.ok) {
@@ -2584,6 +2746,12 @@ void App::follow_room(bool here) {
                 lobby_failed_ = false;
                 lobby_at_ = room_at_;
             }
+            // (the id the service made, kept: it is the one shown, and the game's)
+            if (room.id.size() == 12 && room.id != prefs_.get("online", "id")) {
+                room_id_ = room.id;
+                prefs_.set("online", "id", room.id);
+                prefs_.save();
+            }
             room_ = std::move(room);
         } else {
             room_.ok = false;
@@ -2593,12 +2761,12 @@ void App::follow_room(bool here) {
             }
         }
     }
-    if (!here) {
+    if (!checking_in) {
         if (room_in_) {
             room_in_ = false;
             room_ = {};
             room_at_ = 0;
-            if (!room_fetch_.valid()) {
+            if (!room_fetch_.valid() && !playing) {
                 launcher::room_leave(url, prefs_.get("online", "room"));
             }
         }
@@ -2608,11 +2776,8 @@ void App::follow_room(bool here) {
     if (room_fetch_.valid() || (room_at_ != 0 && SDL_GetTicks() - room_at_ < online_every())) {
         return;
     }
-    // (who this player is: a secret of their own, kept, from which the service makes their id)
-    if (prefs_.get("online", "room").size() != 32) {
-        prefs_.set("online", "room", launcher::new_room_secret());
-        prefs_.save();
-    }
+    // (who this player is: an id of their own, kept, from which the service makes theirs)
+    room_id();
     launcher::RoomCheckIn me;
     me.secret = prefs_.get("online", "room");
     me.name = online_name_;
@@ -2648,7 +2813,7 @@ void App::block(const std::string& id) {
                         room_.players.end());
     for (const launcher::Invitation& invitation : room_.invitations) {
         if (invitation.from == id) {
-            launcher::room_decline(room_url(), prefs_.get("online", "room"), invitation.code);
+            launcher::room_decline(service(room_url()), prefs_.get("online", "room"), invitation.code);
             room_answered_.push_back(invitation.code);
         }
     }
@@ -2725,7 +2890,7 @@ void App::invitations_card(float width) {
             ImGui::SameLine(0.0f, px(10));
             if (ui::button("Decline", Kind::Secondary, 120.0f)) {
                 room_answered_.push_back(invitation->code);
-                launcher::room_decline(room_url(), prefs_.get("online", "room"), invitation->code);
+                launcher::room_decline(service(room_url()), prefs_.get("online", "room"), invitation->code);
             }
             ImGui::SameLine(0.0f, px(10));
             if (ui::button("Block", Kind::Secondary, 100.0f)) {
@@ -2805,11 +2970,24 @@ void App::room_card(float width, const std::vector<size_t>& playable) {
         ImGui::PopID();
     }
     inset_separator(width);
+    // (the id the service knows this player by, kept in launcher.ini as plain text: shown here, and given to another
+    // player to know who is who; a new one is made from a new secret when it is changed)
+    char id_text[32] = {};
+    std::snprintf(id_text, sizeof id_text, "%s", room_id().c_str());
+    row(width, "Your ID",
+        "The id other players know you by. Made from your secret the first time; change it and a new secret is made.",
+        190.0f, 36.0f, [&] {
+            if (ui::text_field("##online_id", id_text, sizeof id_text, "Your id", 190.0f)) {
+                set_room_id(id_text);
+            }
+        });
+    inset_separator(width);
     row(width, "Let others invite me",
-        (named ? std::string("While your ") + (collection_ ? "Online" : "Game") + " page is open, you're in the waiting room under "
-                 "your name, and others can invite you to a match. An invitation never interrupts a game: it waits here."
+        (named ? std::string("While your ") + (collection_ ? "Online" : "Game") +
+                     " page is open (or the sidebar's online switch is on), you're in the waiting room under your name, "
+                     "and others can invite you to a match. An invitation waits here until you answer it."
                : std::string("With a name, you're in the waiting room while your ") + (collection_ ? "Online" : "Game") +
-                 " page is open, and others can invite you to a match.")
+                     " page is open (or the sidebar's online switch is on), and others can invite you to a match.")
             .c_str(),
         42.0f, 24.0f, [&] {
             if (ui::toggle("##online_invitable", invitable)) {
@@ -2999,7 +3177,7 @@ void App::library_page(float width) {
         // (Play first, so that the ring coming into the row from the left is on it)
         row(width, one.name.c_str(), status.c_str(), 230.0f, 36.0f, [&] {
             if (ui::button(one.game.running() ? "Playing…" : "Play", Kind::Primary, 110.0f, usable && !one.game.running())) {
-                play(which);
+                play(which, online_arguments(which));
             }
             ImGui::SameLine(0.0f, px(10));
             file_buttons(which, true);

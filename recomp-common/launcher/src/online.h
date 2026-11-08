@@ -76,5 +76,8 @@ void room_leave(const std::string& url, const std::string& secret);
 void room_decline(const std::string& url, const std::string& secret, const std::string& code);
 // A new secret for the waiting room (32 hex digits), kept in launcher.ini
 std::string new_room_secret();
+// The id the service knows a player by, from their secret: its SHA-256's first 12 hex digits (online/), so the
+// launcher can show it without asking, and it stays the same across services
+std::string room_id(const std::string& secret);
 
 }  // namespace launcher

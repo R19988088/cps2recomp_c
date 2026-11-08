@@ -68,5 +68,7 @@ target_compile_definitions(launcher PRIVATE
     LAUNCHER_ROM_SOUND_PROGRAM="${ROM_SOUND_PROGRAM}" LAUNCHER_ROM_SAMPLES="${ROM_SAMPLES}" LAUNCHER_ROM_KEY="${ROM_KEY}"
     LAUNCHER_DISPLAY_SWITCHES="${DISPLAY_SWITCHES}" LAUNCHER_PLAYERS="${PLAYERS}" LAUNCHER_BUTTONS="${BUTTONS}"
     LAUNCHER_BOARD="${BOARD}" LAUNCHER_CPS_B="${CPS_B}" LAUNCHER_OTHER_SET="${OTHER_SET}")
+# The sidebar's online switch (the waiting room's state, and Host in one move): on in these builds
+target_compile_definitions(launcher PRIVATE LAUNCHER_ONLINE_SWITCH=1)
 find_package(ZLIB REQUIRED)
 target_link_libraries(launcher PRIVATE ZLIB::ZLIB)

@@ -232,6 +232,8 @@ private:
     void play_cards(size_t which, float width, bool ready);
     // Host's arguments for a game's Online: listed under the player's name if they have one, and arcade while waiting
     // if they switched it on; and the row with that switch
+    // What Play starts a game with while the online switch is on: the match's (nothing for another game)
+    std::vector<std::string> online_arguments(size_t which) const;
     std::vector<std::string> host_arguments(const launcher::Online& online) const;
     // Join's: the match (a code or an address), and the player's name, which the game shows the other player
     std::vector<std::string> join_arguments(const launcher::Online& online, const std::string& match) const;
@@ -247,13 +249,26 @@ private:
     // The lobby's list from `url`, fetched again every online_every() while it is shown; the Online page's comes with the
     // waiting room's check-in instead (one request), from a service that gives it
     void follow_lobby(const std::string& url);
-    // The waiting room (Collection::room): checked in at every online_every() while the Online page is open and no game
-    // is running, and left when not; its card, and the invitations' card
+    // The waiting room (Collection::room): checked in at every online_every() while it is on (the sidebar's switch, or
+    // the Online page) and no game runs, and left when not; its card, and the invitations' card
     // The waiting room's URL and protocol: the collection's, or the one game's Online card's (nullptr: none)
+    // (a service of the player's own, [online] service, in place of the build's; the path kept)
+    std::string service(const char* url) const;
     const char* room_url() const;
     int room_protocol() const;
     // A game's id in the waiting room: a collection's game's, or the one game's Online::game
     std::string room_game(size_t which) const;
+    // The player's waiting room id, as launcher.ini keeps it ([online] id, 12 hex digits), made from their secret the
+    // first time; and changing it (a new secret is made, and the id it gives is kept)
+    std::string room_id();
+    void set_room_id(const std::string& id);
+    // Online play switched on for a game: its program runs with the match (the game waits, plays meanwhile, and is in
+    // the waiting room itself: port/main.cpp). Kept in launcher.ini ([online] on, the game's id) and in the file the
+    // game reads (online-state, in the launcher's folder), so that a game started by itself knows it too.
+    bool online_on() const;
+    void set_online_on(bool on, size_t which);
+    // The game online play is on for, if it is one of this launcher's and can be played (slots_.size(): none)
+    size_t online_game() const;
     // A launcher of one game: its sidebar's pages in order, each a port's own page (its place in Description::pages) or
     // -1 - a Page; and the port's own page at a place (-1: none)
     std::vector<int> single_layout() const;
@@ -363,6 +378,7 @@ private:
     bool room_in_ = false;
     bool room_lists_ = true; // (the check-in brings the Online page's lobby list too: until a service answers without it)
     std::vector<std::string> room_answered_;
+    std::string room_id_;             // ([online] id: what the service knows the player by, made from the secret once)
 #ifdef LAUNCHER_UPDATE_REPO
     std::unique_ptr<launcher::Updater> updater_;
     bool relaunched_ = false;  // (the new version has been started: this one quits)

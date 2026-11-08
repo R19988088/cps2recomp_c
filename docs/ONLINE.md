@@ -15,13 +15,18 @@ Each player needs the game and its ROM set. The launcher's **Online** page (in t
 - **Host a match**: choose a game and press **Host**. The game shows the match's code to give the other player. If
   you've set **Your name**, the match is also listed in the lobby under it until someone joins; without a name, only
   those you give the code to can join.
-- **Waiting room**: the other players whose Online page is open now, under their names. Choose a game and press
+- **Waiting room**: the other players who are in one now, under their names. Choose a game and press
   **Invite** next to someone: your game starts and hosts a match, and they see the invitation on their Online page,
   naming you and the game, with **Accept** and **Decline** (and **Add…** if they haven't that game's ROM set). Accept
-  starts their game and joins yours; your game's wait says if they declined. You're in the waiting room while your
-  Online page is open and you've set **Your name**, unless you switch off **Let others invite me**. An invitation never
-  interrupts a game: it waits on the Online page. **Block** (on a player or an invitation) hides the two of you from
-  each other; **Unblock all** undoes it. Nobody's address is shown, only names.
+  starts their game and joins yours; your game's wait says if they declined. You're in the waiting room while the
+  launcher's **Online** switch is on (the foot of the sidebar) or your Online page is open, and you've set **Your
+  name**, unless you switch off **Let others invite me**. **Block** (on a player or an invitation) hides the two of
+  you from each other; **Unblock all** undoes it. Nobody's address is shown, only names.
+- **The sidebar's Online switch**: the foot of the sidebar shows your **Online ID** (kept in launcher.ini as plain
+  text, made from your secret the first time; you may change it on the Online page) and a switch. It is the waiting
+  room's state, and nothing more: switched on, you are in the room (others can invite you, no game started), and if
+  the page of a game is open when you switch it on, that game is started hosting at once — the Online page's
+  **Host** in one move. It goes off when the game ends.
 - **Host from the game**: playing a game on your own, open its menu (Esc), go to **Online** and choose **Host a
   match**. Your game stays exactly your own while you wait: modes, training, cheats, the menu, save states, pause. The
   bottom of the screen says HOSTING with the match's code, and with a name set on the launcher's Online page the match
