@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 Tommy McLeroy. Part of cps2recomp.
+#
+# The collection's launcher for Windows, alone: cps2recomp-launcher.exe, cross-compiled with MinGW-w64.
+# A release's archive holds the games' translated code, which needs their ROM sets, so it can only be built on a
+# machine that has them (docs/RELEASING.md) — never here. This builds the launcher by itself, which has nothing of
+# any game in it, so that it can be put beside an archive's programs: download the artifact and copy it over the
+# cps2recomp-launcher.exe that archive holds.
+name: Windows launcher
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'launcher/**'
+      - 'recomp-common/**'
+      - 'tools/release/lib.sh'
+      - '.github/workflows/windows-launcher.yml'
+
+permissions:
+  contents: read
+
+env:
+  # (what tools/release/lib.sh names, written out here: that file finds the repository from the path it was run
+  # as, which a workflow step has not got)
+  NAME: CPS-2 Recomp
+  EXE: cps2recomp
+  APP_ID: io.github.tmcleroy.cps2recomp
+  SDL_VERSION: 3.4.16
+  SDL_MINGW_SHA256: c7ef65bd72eabac6e5b535411dbd8d5824d0aab24fd62ff8812666b336f18a9c
+
+jobs:
+  launcher:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: The cross-compiler and what the launcher needs
+        run: >
+          sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends
+          ninja-build g++-mingw-w64-x86-64-posix gcc-mingw-w64-x86-64-posix binutils-mingw-w64-x86-64
+          libz-mingw-w64-dev
+      - uses: actions/cache@v4
+        with:
+          path: build/deps
+          key: deps-windows-${{ hashFiles('tools/release/lib.sh', 'tools/release/windows.sh', 'tools/librashader.sh', 'tools/shaders.py') }}
+      - name: Build the launcher
+        run: |
+          set -eu
+          SDL="build/deps/SDL3-mingw-$SDL_VERSION"
+          if [ ! -d "$SDL/x86_64-w64-mingw32" ]; then
+            mkdir -p build/deps
+            curl -fsSL -o build/deps/sdl3-mingw.tar.gz \
+              "https://github.com/libsdl-org/SDL/releases/download/release-$SDL_VERSION/SDL3-devel-$SDL_VERSION-mingw.tar.gz"
+            echo "$SDL_MINGW_SHA256  build/deps/sdl3-mingw.tar.gz" | sha256sum -c - >/dev/null
+            mkdir -p "$SDL"
+            tar -xzf build/deps/sdl3-mingw.tar.gz -C "$SDL" --strip-components=1
+          fi
+          games=$(cd games && for cfg in */game.cfg; do printf '%s;' "${cfg%/game.cfg}"; done)
+          games=${games%;}
+          cmake -S launcher -B build/windows-launcher -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="$PWD/tools/release/mingw-w64.cmake" \
+            -DCMAKE_PREFIX_PATH="$PWD/$SDL/x86_64-w64-mingw32" \
+            -DCMAKE_EXE_LINKER_FLAGS="-static" \
+            -DCOLLECTION=ON -DGAMES="$games" -DGAME_NAME="$NAME" -DGAME_EXE="$EXE" -DAPP_ID="$APP_ID" \
+            -DHOME_ENV=CPS2RECOMP_HOME -DDISCLAIMER="Not affiliated with Capcom." -DCOLLECTION_VERSION="$(cat VERSION)"
+          cmake --build build/windows-launcher
+          x86_64-w64-mingw32-strip build/windows-launcher/cps2recomp-launcher.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-launcher
+          path: build/windows-launcher/cps2recomp-launcher.exe
+          retention-days: 30
