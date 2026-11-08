@@ -38,7 +38,9 @@ check "no file over 512 KB (the README's pictures: 6 MB; third_party/'s decoders
     grep '^docs/screenshots/' "$LIST" | tr '\n' '\0' | xargs -0 find 2>/dev/null -prune -type f -size +6144k) || true)"
 # (ports that are not public yet are not named here)
 check "no names of ports that are still private" "$(grep_files -i -e 'snesrecomp' -e 'fighting.?vipers' -e 'bonkers' -e 'muscle.?march-dev' || true)"
-check "no words that point to where game files or keys are found" "$(grep_files -i -e 'archive\.org' -e 'rom ?sites?\b' -e 'emuparadise' -e 'vimm' -e 'romsfun' -e 'cps2crpt\.c' -e 'torrent' -e 'download (the|a|an) (rom|rom set|key|key file)' || true)"
+# (the README's table of the sets this build can play links to archive.org, by the project owner's decision: the
+# address is the one the launcher itself was told about. Everywhere else these words stay out.)
+check "no words that point to where game files or keys are found" "$(grep_files -i -e 'archive\.org' -e 'rom ?sites?\b' -e 'emuparadise' -e 'vimm' -e 'romsfun' -e 'cps2crpt\.c' -e 'torrent' -e 'download (the|a|an) (rom|rom set|key|key file)' | grep -v '^README\.md:' || true)"
 check "no submodules" "$(git ls-files -s | awk '$1 == "160000" {print $4}'; [ ! -f .gitmodules ] || echo .gitmodules)"
 check "no patch files" "$(grep -iE '\.(patch|diff)$|(^|/)patches/' "$LIST" || true)"
 check "no emulator's sources in the tree" "$(grep -iE '(^|/)(third_party|vendor|external|deps)/.+/.+|(^|/)(mame|fbneo|fbalpha|musashi|libretro)[^/]*/' "$LIST" || true)"
